@@ -1,0 +1,10 @@
+rootProject.name = 'aissue'
+
+// 모든 서브모듈을 선언해야 Gradle이 인식
+include 'common'
+include 'eureka-server'
+include 'config-server'
+include 'gateway'
+include 'auth-service'
+include 'user-service'
+include 'content-collection-service'
