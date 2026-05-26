@@ -1,0 +1,18 @@
+// Auth Service - 인증/인가 서비스
+dependencies {
+    // 공통 라이브러리 (BaseEntity, 예외, Redis, S3, Swagger 등 포함)
+    implementation project(':common')
+
+    // Web + Security
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    testImplementation 'org.springframework.security:spring-security-test'
+
+    // Redis
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+
+    // 서비스 디스커버리 + 중앙 설정 + 로드밸런서
+    implementation 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client'
+    implementation 'org.springframework.cloud:spring-cloud-starter-config'
+    implementation 'org.springframework.cloud:spring-cloud-starter-loadbalancer'
+}

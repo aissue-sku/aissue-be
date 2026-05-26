@@ -1,0 +1,14 @@
+spring:
+  application:
+    name: content-collection-service
+  config:
+    import: "optional:configserver:http://localhost:8888"
+
+server:
+  port: 8083
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info

@@ -1,0 +1,17 @@
+// User Service - 사용자 서비스
+dependencies {
+    // 공통 라이브러리
+    implementation project(':common')
+
+    // Web + Security
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+
+    // DB
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    runtimeOnly 'com.mysql:mysql-connector-j'
+
+    // 서비스 디스커버리 + 중앙 설정
+    implementation 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client'
+    implementation 'org.springframework.cloud:spring-cloud-starter-config'
+}

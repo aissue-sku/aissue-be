@@ -1,0 +1,34 @@
+// Content Collection Service - 콘텐츠 수집 서비스
+dependencies {
+  // 공통 라이브러리
+  implementation project(':common')
+
+  // Web + Security
+  implementation 'org.springframework.boot:spring-boot-starter-web'
+  implementation 'org.springframework.boot:spring-boot-starter-security'
+  implementation 'org.springframework.boot:spring-boot-starter-validation'
+
+  // DB
+  implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+  runtimeOnly 'com.mysql:mysql-connector-j'
+
+  // HTTP 클라이언트 (외부 API 호출)
+  implementation 'org.springframework.boot:spring-boot-starter-webflux'
+
+  // RSS 파싱
+  implementation 'com.rometools:rome:2.1.0'
+
+  // HTML 파싱 (URL 본문 추출)
+  implementation 'org.jsoup:jsoup:1.17.2'
+
+  // 캐시 (GPT API 호출 횟수 절약)
+  implementation 'org.springframework.boot:spring-boot-starter-cache'
+  implementation 'com.github.ben-manes.caffeine:caffeine'
+
+  // AWS S3
+  implementation "io.awspring.cloud:spring-cloud-aws-starter-s3:${springCloudAwsVersion}"
+
+  // 서비스 디스커버리 + 중앙 설정
+  implementation 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client'
+  implementation 'org.springframework.cloud:spring-cloud-starter-config'
+}

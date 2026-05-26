@@ -1,0 +1,19 @@
+// Gateway - API 게이트웨이 (WebFlux 기반, common 의존 불가)
+dependencies {
+    // Spring Cloud Gateway (WebFlux 내장)
+    implementation 'org.springframework.cloud:spring-cloud-starter-gateway-server-webflux'
+
+    // 서비스 디스커버리
+    implementation 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client'
+
+    // 중앙 설정
+    implementation 'org.springframework.cloud:spring-cloud-starter-config'
+
+    // JWT 검증 (WebFlux 환경 전용)
+    implementation "io.jsonwebtoken:jjwt-api:${jjwtVersion}"
+    runtimeOnly "io.jsonwebtoken:jjwt-impl:${jjwtVersion}"
+    runtimeOnly "io.jsonwebtoken:jjwt-jackson:${jjwtVersion}"
+
+    // Monitoring
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+}
