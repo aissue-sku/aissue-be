@@ -56,4 +56,7 @@ public class IssueCard {
 
   @Column(name = "rank_order")
   private Integer rankOrder;
+
+  @Column(length = 150)
+  private String teaser;
 }

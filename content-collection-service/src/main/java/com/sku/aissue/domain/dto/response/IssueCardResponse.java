@@ -20,6 +20,9 @@ public class IssueCardResponse {
   @Schema(description = "독자의 궁금증을 자극하는 제목", example = "아이 키우고 집안일 해도 582조의 숨겨진 진실!")
   private String title;
 
+  @Schema(description = "기사를 클릭하게 만드는 궁금증 유발 질문", example = "진짜 피해자는 따로 있다고?")
+  private String teaser;
+
   @Schema(description = "DALL-E로 생성된 주제 관련 이미지 URL")
   private String imageUrl;
 

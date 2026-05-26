@@ -56,6 +56,7 @@ public class IssueCardService {
           {
             "tags": ["핵심키워드", "연관키워드1", "연관키워드2"],
             "hook": "Provocative Korean sentence (max 35 chars, end with . or !)",
+            "teaser": "Curiosity-inducing Korean question (max 40 chars, must end with ?)",
             "sourceUrl": "original URL",
             "imagePrompt": "English visual description for editorial illustration (max 20 words, no text, no specific faces)"
           }
@@ -71,6 +72,11 @@ public class IssueCardService {
       - Urgency: 지금 당장, 벼랑 끝, X일 안에, 이미 늦었나
       - Curiosity: 아무도 몰랐던, 숨겨진 진실, 진짜 이유
       - Specificity: numbers, amounts, timeframes
+
+      Teaser rules:
+      - Must be a question (end with ?)
+      - Hook raises the tension; teaser asks the unanswered question that makes readers click
+      - Examples: "진짜 피해자는 따로 있다고?", "왜 지금 이 뉴스가 터졌을까?", "당신의 지갑에도 영향이 올까?"
 
       imagePrompt rules:
       - Describe a scene or concept that visually represents the topic
@@ -155,6 +161,7 @@ public class IssueCardService {
                   String imageUrl = null;
                   return IssueCard.builder()
                       .title(card.hook())
+                      .teaser(card.teaser())
                       .imageUrl(imageUrl)
                       .tags(serializeTags(card.tags()))
                       .category(
@@ -229,6 +236,7 @@ public class IssueCardService {
     return IssueCardResponse.builder()
         .id(card.getContentId() != null ? card.getContentId().toString() : null)
         .title(card.getTitle())
+        .teaser(card.getTeaser())
         .imageUrl(card.getImageUrl())
         .timeAgo(toTimeAgo(card.getPublishedAt()))
         .tags(deserializeTags(card.getTags()))
@@ -334,5 +342,5 @@ public class IssueCardService {
     return days + "일 전";
   }
 
-  private record GptCard(List<String> tags, String hook, String sourceUrl, String imagePrompt) {}
+  private record GptCard(List<String> tags, String hook, String teaser, String sourceUrl, String imagePrompt) {}
 }
