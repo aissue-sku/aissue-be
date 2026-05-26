@@ -14,6 +14,9 @@ dependencies {
     runtimeOnly "io.jsonwebtoken:jjwt-impl:${jjwtVersion}"
     runtimeOnly "io.jsonwebtoken:jjwt-jackson:${jjwtVersion}"
 
+    // Swagger UI 통합 (WebFlux 전용)
+    implementation "org.springdoc:springdoc-openapi-starter-webflux-ui:${springdocVersion}"
+
     // Monitoring
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
 }

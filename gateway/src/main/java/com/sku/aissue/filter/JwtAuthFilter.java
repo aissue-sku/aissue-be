@@ -38,7 +38,13 @@ public class JwtAuthFilter implements GlobalFilter, Ordered {
           "/api/auths/test-login",
           "/api/auths/refresh",
           "/api/users/sign-up",
-          "/actuator/health");
+          "/actuator/health",
+          "/swagger-ui",
+          "/webjars",
+          "/auth/v3/api-docs",
+          "/user/v3/api-docs",
+          "/content/v3/api-docs",
+          "/notification/v3/api-docs");
 
   @Override
   public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
