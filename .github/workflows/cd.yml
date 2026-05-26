@@ -8,8 +8,6 @@ jobs:
   build-and-push:
     name: Build & Push Docker Images
     runs-on: ubuntu-latest
-    environment: production
-
     steps:
       - name: Checkout repository (with submodules)
         uses: actions/checkout@v4
