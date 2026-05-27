@@ -68,6 +68,12 @@ public class NotificationControllerImpl implements NotificationController {
   }
 
   @Override
+  public ResponseEntity<BaseResponse<Void>> deleteNotification(String userId, Long id) {
+    notificationService.deleteNotification(userId, id);
+    return ResponseEntity.ok(BaseResponse.success(200, "알림 삭제 완료", null));
+  }
+
+  @Override
   public ResponseEntity<BaseResponse<Void>> deleteReadNotifications(String userId) {
     notificationService.deleteReadNotifications(userId);
     return ResponseEntity.ok(BaseResponse.success(200, "읽은 알림 삭제 완료", null));

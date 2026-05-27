@@ -31,7 +31,6 @@ import com.sku.aissue.domain.repository.ContentRepository;
 import com.sku.aissue.domain.repository.IssueCardRepository;
 import com.sku.aissue.domain.repository.TrendingKeywordRepository;
 import com.sku.aissue.exception.CustomException;
-import com.sku.aissue.global.client.NotificationServiceClient;
 import com.sku.aissue.global.client.OpenAiClient;
 import com.sku.aissue.global.s3.S3ImageService;
 
@@ -57,6 +56,7 @@ public class IssueCardService {
             "tags": ["핵심키워드", "연관키워드1", "연관키워드2"],
             "hook": "Provocative Korean sentence (max 35 chars, end with . or !)",
             "teaser": "Curiosity-inducing Korean question (max 40 chars, must end with ?)",
+            "category": "카테고리",
             "sourceUrl": "original URL",
             "imagePrompt": "English visual description for editorial illustration (max 20 words, no text, no specific faces)"
           }
@@ -78,6 +78,10 @@ public class IssueCardService {
       - Hook raises the tension; teaser asks the unanswered question that makes readers click
       - Examples: "진짜 피해자는 따로 있다고?", "왜 지금 이 뉴스가 터졌을까?", "당신의 지갑에도 영향이 올까?"
 
+      category rules:
+      - Choose exactly ONE from: 정치, 경제, 사회, 과학/IT, 문화/연예, 스포츠, 국제, 기타
+      - Base on the main topic of the article
+
       imagePrompt rules:
       - Describe a scene or concept that visually represents the topic
       - Editorial/news illustration style
@@ -98,7 +102,6 @@ public class IssueCardService {
   private final S3ImageService s3ImageService;
   private final ArticleCritiqueService articleCritiqueService;
   private final ContentAnalysisService contentAnalysisService;
-  private final NotificationServiceClient notificationServiceClient;
 
   @Cacheable(value = "issueCards", key = "'latest'")
   public List<IssueCardResponse> getIssueCards() {
@@ -164,10 +167,7 @@ public class IssueCardService {
                       .teaser(card.teaser())
                       .imageUrl(imageUrl)
                       .tags(serializeTags(card.tags()))
-                      .category(
-                          content != null && content.getCategory() != null
-                              ? content.getCategory()
-                              : "일반")
+                      .category(card.category() != null ? card.category() : "기타")
                       .contentId(content != null ? content.getId() : null)
                       .sourceUrl(content != null ? content.getUrl() : card.sourceUrl())
                       .publishedAt(content != null ? content.getPublishedAt() : null)
@@ -182,34 +182,8 @@ public class IssueCardService {
 
     log.info("키워드 기반 이슈 카드 생성 완료 - {}개", savedCards.size());
 
-    // 구독 키워드 알림 매칭
-    notifySubscribers(savedCards, keywordToContent);
-
     // 각 기사에 대한 비평·신뢰도 분석 사전 계산 (API 호출 시 DB에서 즉시 반환)
     preComputeAnalyses(keywordToContent);
-  }
-
-  private void notifySubscribers(
-      List<IssueCard> savedCards, Map<String, Content> keywordToContent) {
-    Map<String, String> urlToKeyword =
-        keywordToContent.entrySet().stream()
-            .filter(e -> e.getValue().getUrl() != null)
-            .collect(Collectors.toMap(e -> e.getValue().getUrl(), Map.Entry::getKey, (a, b) -> a));
-
-    List<NotificationServiceClient.CardInfo> cardInfos =
-        savedCards.stream()
-            .filter(card -> card.getSourceUrl() != null)
-            .map(
-                card -> {
-                  String keyword = urlToKeyword.get(card.getSourceUrl());
-                  List<String> tags = deserializeTags(card.getTags());
-                  List<String> keywords = keyword != null ? List.of(keyword) : tags;
-                  return new NotificationServiceClient.CardInfo(
-                      card.getTitle(), card.getSourceUrl(), card.getContentId(), keywords);
-                })
-            .toList();
-
-    notificationServiceClient.matchAndNotify(cardInfos);
   }
 
   private void preComputeAnalyses(Map<String, Content> keywordToContent) {
@@ -342,5 +316,11 @@ public class IssueCardService {
     return days + "일 전";
   }
 
-  private record GptCard(List<String> tags, String hook, String teaser, String sourceUrl, String imagePrompt) {}
+  private record GptCard(
+      List<String> tags,
+      String hook,
+      String teaser,
+      String category,
+      String sourceUrl,
+      String imagePrompt) {}
 }

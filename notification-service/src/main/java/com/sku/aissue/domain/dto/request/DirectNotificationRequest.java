@@ -15,4 +15,6 @@ public class DirectNotificationRequest {
   private String userId;
   private String keyword;
   private String title;
+  private String url;
+  private Long contentId;
 }

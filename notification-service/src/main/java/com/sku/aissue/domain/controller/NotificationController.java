@@ -62,6 +62,11 @@ public interface NotificationController {
   @PatchMapping("/read-all")
   ResponseEntity<BaseResponse<Void>> markAllAsRead(@AuthenticationPrincipal String userId);
 
+  @Operation(summary = "알림 개별 삭제")
+  @DeleteMapping("/{id}")
+  ResponseEntity<BaseResponse<Void>> deleteNotification(
+      @AuthenticationPrincipal String userId, @PathVariable Long id);
+
   @Operation(summary = "읽은 알림 전체 삭제")
   @DeleteMapping("/read")
   ResponseEntity<BaseResponse<Void>> deleteReadNotifications(

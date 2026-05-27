@@ -31,7 +31,23 @@ public class NotificationServiceClient {
     }
   }
 
+  public void sendDirect(String userId, String title, String url, Long contentId) {
+    if (userId == null) return;
+    try {
+      restTemplate.postForObject(
+          "http://notification-service/internal/notifications/direct",
+          new DirectRequest(userId, "직접 분석", title, url, contentId),
+          Void.class);
+      log.info("직접 분석 알림 전송 - userId: {}", userId);
+    } catch (Exception e) {
+      log.error("알림 서비스 호출 실패 (direct) - error: {}", e.getMessage());
+    }
+  }
+
   public record CardInfo(String title, String url, Long contentId, List<String> keywords) {}
 
   private record MatchRequest(List<CardInfo> cards) {}
+
+  private record DirectRequest(
+      String userId, String keyword, String title, String url, Long contentId) {}
 }

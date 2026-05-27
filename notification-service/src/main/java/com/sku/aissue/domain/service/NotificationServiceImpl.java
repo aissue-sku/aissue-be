@@ -104,6 +104,20 @@ public class NotificationServiceImpl implements NotificationService {
 
   @Override
   @Transactional
+  public void deleteNotification(String userId, Long notificationId) {
+    Notification notification =
+        notificationRepository
+            .findById(notificationId)
+            .orElseThrow(() -> new CustomException(NotificationErrorCode.NOTIFICATION_NOT_FOUND));
+    if (!notification.getUserId().equals(userId)) {
+      throw new CustomException(NotificationErrorCode.UNAUTHORIZED);
+    }
+    notificationRepository.delete(notification);
+    log.info("알림 삭제 - userId: {}, notificationId: {}", userId, notificationId);
+  }
+
+  @Override
+  @Transactional
   public void deleteReadNotifications(String userId) {
     notificationRepository.deleteReadByUserId(userId);
     log.info("읽은 알림 삭제 - userId: {}", userId);
@@ -148,6 +162,8 @@ public class NotificationServiceImpl implements NotificationService {
             .userId(request.getUserId())
             .keyword(request.getKeyword())
             .title(request.getTitle())
+            .url(request.getUrl())
+            .contentId(request.getContentId())
             .build());
     log.info("시스템 알림 전송 - userId: {}, keyword: {}", request.getUserId(), request.getKeyword());
   }

@@ -28,9 +28,15 @@ public interface ContentRepository extends JpaRepository<Content, Long> {
   // 키워드 검색 (title 기준)
   List<Content> findByTitleContainingIgnoreCaseOrderByPublishedAtDesc(String keyword);
 
-  // 키워드 검색 - 건수 제한
+  // 키워드 검색 - 건수 제한 (offset 기반, 스케줄러 내부 사용)
   List<Content> findByTitleContainingIgnoreCaseOrderByPublishedAtDesc(
       String keyword, Pageable pageable);
+
+  // 키워드 검색 커서 기반 (무한스크롤): id < cursor 조건으로 최신순 조회
+  @Query(
+      "SELECT c FROM Content c WHERE LOWER(c.title) LIKE LOWER(CONCAT('%', :keyword, '%')) AND c.id < :cursor ORDER BY c.id DESC")
+  List<Content> findByKeywordBeforeCursor(
+      @Param("keyword") String keyword, @Param("cursor") Long cursor, Pageable pageable);
 
   // 바이그램 키워드용: 두 단어 모두 포함하는 기사 검색
   @Query(

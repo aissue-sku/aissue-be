@@ -32,7 +32,10 @@ public class IssueCardResponse {
   @Schema(description = "연관 키워드 태그 목록 (3개)", example = "[\"육아\", \"가사노동\", \"경제적 가치\"]")
   private List<String> tags;
 
-  @Schema(description = "기사 카테고리", example = "경제")
+  @Schema(
+      description = "기사 카테고리 (정치, 경제, 사회, 과학/IT, 문화/연예, 스포츠, 국제, 기타)",
+      example = "경제",
+      allowableValues = {"정치", "경제", "사회", "과학/IT", "문화/연예", "스포츠", "국제", "기타"})
   private String category;
 
   @Schema(description = "원문 기사 URL", example = "https://www.hani.co.kr/arti/economy/1234567.html")

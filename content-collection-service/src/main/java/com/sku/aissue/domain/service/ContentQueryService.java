@@ -25,6 +25,8 @@ import com.sku.aissue.domain.repository.ContentRepository;
 import com.sku.aissue.domain.repository.TrendingSnapshotRepository;
 import com.sku.aissue.exception.CustomException;
 import com.sku.aissue.exception.GlobalErrorCode;
+import com.sku.aissue.global.client.NotificationServiceClient;
+import com.sku.aissue.global.page.InfiniteResponse;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -40,6 +42,7 @@ public class ContentQueryService {
   private final ContentSaveService contentSaveService;
   private final ArticleExtractor articleExtractor;
   private final ContentAnalysisService contentAnalysisService;
+  private final NotificationServiceClient notificationServiceClient;
 
   public List<TrendingContentResponse> getTrending(PeriodType periodType) {
     log.info("트렌딩 조회 요청 시작 - periodType: {}", periodType);
@@ -77,13 +80,20 @@ public class ContentQueryService {
     return result;
   }
 
-  public List<NewsItemResponse> getKeywordNews(String keyword, int page, int size) {
-    log.info("키워드 뉴스 조회 요청 시작 - keyword: {}, page: {}, size: {}", keyword, page, size);
-    List<NewsItemResponse> result =
-        contentRepository
-            .findByTitleContainingIgnoreCaseOrderByPublishedAtDesc(
-                keyword, PageRequest.of(page, size))
-            .stream()
+  public InfiniteResponse<NewsItemResponse> getKeywordNews(String keyword, Long cursor, int size) {
+    log.info("키워드 뉴스 조회 - keyword: {}, cursor: {}, size: {}", keyword, cursor, size);
+
+    long effectiveCursor = cursor != null ? cursor : Long.MAX_VALUE;
+    // size+1 개 조회로 hasNext 판단
+    List<Content> fetched =
+        contentRepository.findByKeywordBeforeCursor(
+            keyword, effectiveCursor, PageRequest.of(0, size + 1));
+
+    boolean hasNext = fetched.size() > size;
+    List<Content> pageContents = hasNext ? fetched.subList(0, size) : fetched;
+
+    List<NewsItemResponse> content =
+        pageContents.stream()
             .map(
                 c ->
                     NewsItemResponse.builder()
@@ -98,8 +108,16 @@ public class ContentQueryService {
                         .url(c.getUrl())
                         .build())
             .toList();
-    log.info("키워드 뉴스 조회 성공 - keyword: {}, 건수: {}", keyword, result.size());
-    return result;
+
+    Long lastCursor = content.isEmpty() ? null : Long.parseLong(content.getLast().getId());
+    log.info(
+        "키워드 뉴스 조회 성공 - keyword: {}, 반환 건수: {}, hasNext: {}", keyword, content.size(), hasNext);
+    return InfiniteResponse.<NewsItemResponse>builder()
+        .content(content)
+        .lastCursor(lastCursor)
+        .hasNext(hasNext)
+        .size(content.size())
+        .build();
   }
 
   private String toTimeAgo(LocalDateTime dateTime) {
@@ -122,6 +140,9 @@ public class ContentQueryService {
     AnalysisScoreResponse result =
         contentAnalysisService.analyze(dto.getTitle(), dto.getUrl(), dto.getBody(), username);
     log.info("콘텐츠 분석 성공 - username: {}, totalScore: {}", username, result.getTotalScore());
+
+    notificationServiceClient.sendDirect(username, dto.getTitle(), dto.getUrl(), content.getId());
+
     return result.toBuilder().contentId(content.getId()).build();
   }
 

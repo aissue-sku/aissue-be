@@ -26,6 +26,7 @@ import com.sku.aissue.domain.dto.response.NewsItemResponse;
 import com.sku.aissue.domain.dto.response.TrendingContentResponse;
 import com.sku.aissue.domain.dto.response.TrendingKeywordResponse;
 import com.sku.aissue.domain.entity.PeriodType;
+import com.sku.aissue.global.page.InfiniteResponse;
 import com.sku.aissue.response.BaseResponse;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -373,13 +374,15 @@ public interface ContentController {
       description =
           """
           키워드가 제목에 포함된 뉴스를 최신순으로 반환합니다. **인증 불필요.**
-          - 빈 배열 반환 시 마지막 페이지입니다.
+          - 첫 요청: `cursor` 생략
+          - 다음 요청: 이전 응답의 `lastCursor` 값을 `cursor`로 전달
+          - `hasNext: false`이면 마지막 페이지입니다.
           """)
   @ApiResponses({@ApiResponse(responseCode = "200", description = "조회 성공")})
-  ResponseEntity<BaseResponse<List<NewsItemResponse>>> getKeywordNews(
+  ResponseEntity<BaseResponse<InfiniteResponse<NewsItemResponse>>> getKeywordNews(
       @Parameter(description = "검색 키워드", example = "전기차 화재") @RequestParam String keyword,
-      @Parameter(description = "페이지 번호 (0부터)", example = "0") @RequestParam(defaultValue = "0")
-          int page,
+      @Parameter(description = "커서 (이전 응답의 lastCursor, 첫 요청 시 생략)") @RequestParam(required = false)
+          Long cursor,
       @Parameter(description = "페이지 크기", example = "10") @RequestParam(defaultValue = "10")
           int size);
 

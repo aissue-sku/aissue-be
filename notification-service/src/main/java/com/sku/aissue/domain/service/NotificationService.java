@@ -27,6 +27,8 @@ public interface NotificationService {
 
   void markAllAsRead(String userId);
 
+  void deleteNotification(String userId, Long notificationId);
+
   void deleteReadNotifications(String userId);
 
   void matchAndNotify(NotificationMatchRequest request);

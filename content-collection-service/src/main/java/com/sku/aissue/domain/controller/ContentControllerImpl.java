@@ -34,6 +34,8 @@ import com.sku.aissue.domain.service.ContentQueryService;
 import com.sku.aissue.domain.service.HotTopicService;
 import com.sku.aissue.domain.service.IssueCardService;
 import com.sku.aissue.domain.service.TrendingService;
+import com.sku.aissue.global.client.NotificationServiceClient;
+import com.sku.aissue.global.page.InfiniteResponse;
 import com.sku.aissue.response.BaseResponse;
 
 import lombok.RequiredArgsConstructor;
@@ -52,6 +54,7 @@ public class ContentControllerImpl implements ContentController {
   private final TrendingKeywordRepository trendingKeywordRepository;
   private final ContentAnalysisRepository contentAnalysisRepository;
   private final SubscriptionRepository subscriptionRepository;
+  private final NotificationServiceClient notificationServiceClient;
 
   @Override
   public ResponseEntity<BaseResponse<Void>> refreshTrending() {
@@ -113,18 +116,22 @@ public class ContentControllerImpl implements ContentController {
     String body;
 
     ArticleCritiqueResponse result;
+    String articleUrl = null;
     if (request.getType() == ContentSubmitRequest.SubmitType.URL) {
-      String url = request.getContent();
-      ArticleExtractor.ExtractedArticle article = articleExtractor.extract(url);
-      title = (article.title() != null && !article.title().isBlank()) ? article.title() : url;
+      articleUrl = request.getContent();
+      ArticleExtractor.ExtractedArticle article = articleExtractor.extract(articleUrl);
+      title =
+          (article.title() != null && !article.title().isBlank()) ? article.title() : articleUrl;
       body = article.body();
-      result = articleCritiqueService.analyzeWithCache(title, body, url);
+      result = articleCritiqueService.analyzeWithCache(title, body, articleUrl);
     } else {
       String text = request.getContent();
       title = text.length() > 50 ? text.substring(0, 50) + "..." : text;
       body = text;
       result = articleCritiqueService.analyze(title, body);
     }
+
+    notificationServiceClient.sendDirect(username, title, articleUrl, null);
 
     return ResponseEntity.ok(BaseResponse.success(result));
   }
@@ -140,10 +147,10 @@ public class ContentControllerImpl implements ContentController {
   }
 
   @Override
-  public ResponseEntity<BaseResponse<List<NewsItemResponse>>> getKeywordNews(
-      String keyword, int page, int size) {
+  public ResponseEntity<BaseResponse<InfiniteResponse<NewsItemResponse>>> getKeywordNews(
+      String keyword, Long cursor, int size) {
     return ResponseEntity.ok(
-        BaseResponse.success(contentQueryService.getKeywordNews(keyword, page, size)));
+        BaseResponse.success(contentQueryService.getKeywordNews(keyword, cursor, size)));
   }
 
   @Override
