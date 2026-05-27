@@ -111,7 +111,7 @@ public class SecurityConfig {
                     "/api/auths/login",
                     "/api/auths/test-login",
                     "/api/auths/refresh",
-                    "/actuator/health")
+                    "/actuator/**")
                 .permitAll()
 
                 // 권한 필요 엔드포인트

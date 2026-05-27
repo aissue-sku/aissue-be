@@ -45,7 +45,7 @@ public class SecurityConfig {
                         "/v3/api-docs/**",
                         "/api/users/sign-up",
                         "/internal/**",
-                        "/actuator/health")
+                        "/actuator/**")
                     .permitAll()
                     .requestMatchers(RegexRequestMatcher.regexMatcher(".*/dev(/.*)?"))
                     .hasRole("DEVELOPER")

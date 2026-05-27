@@ -17,6 +17,9 @@ dependencies {
     // Swagger UI 통합 (WebFlux 전용)
     implementation "org.springdoc:springdoc-openapi-starter-webflux-ui:${springdocVersion}"
 
+    // Security (actuator 엔드포인트 보안 설정용)
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+
     // Monitoring
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
 }
