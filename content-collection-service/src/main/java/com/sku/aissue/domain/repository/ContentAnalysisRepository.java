@@ -14,4 +14,6 @@ public interface ContentAnalysisRepository extends JpaRepository<ContentAnalysis
   List<ContentAnalysis> findByUserIdOrderByAnalyzedAtDesc(String userId);
 
   java.util.Optional<ContentAnalysis> findTopByUrlOrderByAnalyzedAtDesc(String url);
+
+  boolean existsByUserIdAndUrl(String userId, String url);
 }

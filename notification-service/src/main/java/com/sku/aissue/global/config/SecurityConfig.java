@@ -32,7 +32,11 @@ public class SecurityConfig {
         .authorizeHttpRequests(
             auth ->
                 auth.requestMatchers(
-                        "/swagger-ui/**", "/v3/api-docs/**", "/internal/**", "/actuator/**")
+                        "/swagger-ui/**",
+                        "/v3/api-docs/**",
+                        "/internal/**",
+                        "/actuator/**",
+                        "/api/notifications/popular-keywords")
                     .permitAll()
                     .anyRequest()
                     .authenticated());

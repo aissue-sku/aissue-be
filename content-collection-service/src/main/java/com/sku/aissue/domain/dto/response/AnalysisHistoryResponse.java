@@ -19,6 +19,9 @@ public class AnalysisHistoryResponse {
   @Schema(description = "분석 ID", example = "1")
   private final Long id;
 
+  @Schema(description = "콘텐츠 ID (상세 조회 시 사용)", example = "42")
+  private final Long contentId;
+
   @Schema(description = "분석한 콘텐츠 제목", example = "트럼프, 관세 25% 전격 발표")
   private final String title;
 
@@ -34,9 +37,10 @@ public class AnalysisHistoryResponse {
   @Schema(description = "분석 일시")
   private final LocalDateTime analyzedAt;
 
-  public static AnalysisHistoryResponse from(ContentAnalysis analysis) {
+  public static AnalysisHistoryResponse from(ContentAnalysis analysis, Long contentId) {
     return AnalysisHistoryResponse.builder()
         .id(analysis.getId())
+        .contentId(contentId)
         .title(analysis.getTitle())
         .url(analysis.getUrl())
         .totalScore(analysis.getTotalScore())

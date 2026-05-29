@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 
 import com.sku.aissue.domain.dto.request.SubscribeRequest;
 import com.sku.aissue.domain.dto.response.NotificationResponse;
+import com.sku.aissue.domain.dto.response.PopularKeywordResponse;
 import com.sku.aissue.domain.dto.response.SubscriptionResponse;
 import com.sku.aissue.response.BaseResponse;
 
@@ -71,4 +72,8 @@ public interface NotificationController {
   @DeleteMapping("/read")
   ResponseEntity<BaseResponse<Void>> deleteReadNotifications(
       @AuthenticationPrincipal String userId);
+
+  @Operation(summary = "인기 검색어 Top 3", description = "사용자가 가장 많이 구독한 키워드 상위 3개를 반환합니다. **인증 불필요.**")
+  @GetMapping("/popular-keywords")
+  ResponseEntity<BaseResponse<List<PopularKeywordResponse>>> getPopularKeywords();
 }

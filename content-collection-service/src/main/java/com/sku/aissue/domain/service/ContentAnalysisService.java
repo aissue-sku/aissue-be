@@ -269,6 +269,13 @@ public class ContentAnalysisService {
 
   private void saveHistory(
       String title, String url, String userId, AnalysisScoreResponse result, String detailsJson) {
+    // 동일 사용자 + 동일 URL 중복 이력 방지
+    if (userId != null
+        && url != null
+        && contentAnalysisRepository.existsByUserIdAndUrl(userId, url)) {
+      log.info("분석 이력 중복 스킵 - userId: {}, url: {}", userId, url);
+      return;
+    }
     ContentAnalysis analysis =
         ContentAnalysis.builder()
             .userId(userId)

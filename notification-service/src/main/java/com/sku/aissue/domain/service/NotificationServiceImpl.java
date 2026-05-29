@@ -5,6 +5,7 @@ package com.sku.aissue.domain.service;
 
 import java.util.List;
 
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -12,6 +13,7 @@ import com.sku.aissue.domain.dto.request.DirectNotificationRequest;
 import com.sku.aissue.domain.dto.request.NotificationMatchRequest;
 import com.sku.aissue.domain.dto.request.SubscribeRequest;
 import com.sku.aissue.domain.dto.response.NotificationResponse;
+import com.sku.aissue.domain.dto.response.PopularKeywordResponse;
 import com.sku.aissue.domain.dto.response.SubscriptionResponse;
 import com.sku.aissue.domain.entity.Notification;
 import com.sku.aissue.domain.entity.Subscription;
@@ -157,6 +159,12 @@ public class NotificationServiceImpl implements NotificationService {
   @Override
   @Transactional
   public void sendDirect(DirectNotificationRequest request) {
+    if (request.getUrl() != null
+        && notificationRepository.existsByUserIdAndKeywordAndUrl(
+            request.getUserId(), request.getKeyword(), request.getUrl())) {
+      log.info("중복 알림 스킵 - userId: {}, url: {}", request.getUserId(), request.getUrl());
+      return;
+    }
     notificationRepository.save(
         Notification.builder()
             .userId(request.getUserId())
@@ -166,6 +174,18 @@ public class NotificationServiceImpl implements NotificationService {
             .contentId(request.getContentId())
             .build());
     log.info("시스템 알림 전송 - userId: {}, keyword: {}", request.getUserId(), request.getKeyword());
+  }
+
+  @Override
+  public List<PopularKeywordResponse> getPopularKeywords() {
+    return subscriptionRepository.findTopKeywordsBySubscriberCount(PageRequest.of(0, 3)).stream()
+        .map(
+            row ->
+                PopularKeywordResponse.builder()
+                    .keyword((String) row[0])
+                    .subscriberCount((Long) row[1])
+                    .build())
+        .toList();
   }
 
   private NotificationResponse toResponse(Notification n) {

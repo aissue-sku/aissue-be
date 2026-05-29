@@ -23,6 +23,7 @@ import com.sku.aissue.domain.dto.response.ArticleCritiqueResponse;
 import com.sku.aissue.domain.dto.response.ContentResponse;
 import com.sku.aissue.domain.dto.response.HotTopicResponse;
 import com.sku.aissue.domain.dto.response.NewsItemResponse;
+import com.sku.aissue.domain.dto.response.PopularKeywordResponse;
 import com.sku.aissue.domain.dto.response.TrendingContentResponse;
 import com.sku.aissue.domain.dto.response.TrendingKeywordResponse;
 import com.sku.aissue.domain.entity.PeriodType;
@@ -426,6 +427,12 @@ public interface ContentController {
   })
   ResponseEntity<BaseResponse<ArticleCritiqueResponse>> critique(
       @RequestBody @Valid ContentSubmitRequest request, @AuthenticationPrincipal String username);
+
+  @GetMapping("/popular-keywords")
+  @SecurityRequirements
+  @Operation(summary = "인기 검색어 Top 3", description = "사용자가 가장 많이 구독한 키워드 상위 3개를 반환합니다. **인증 불필요.**")
+  @ApiResponses({@ApiResponse(responseCode = "200", description = "조회 성공")})
+  ResponseEntity<BaseResponse<List<PopularKeywordResponse>>> getPopularKeywords();
 
   @GetMapping("/hot-topics")
   @SecurityRequirements

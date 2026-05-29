@@ -221,25 +221,32 @@ public class IssueCardService {
 
   private List<Content> findArticleForKeyword(String keyword) {
     PageRequest top1 = PageRequest.of(0, 1);
-    if (!keyword.contains(" ")) {
+    String[] words = keyword.trim().split("\\s+");
+
+    if (words.length == 1) {
       return contentRepository.findByTitleContainingIgnoreCaseOrderByPublishedAtDesc(keyword, top1);
     }
 
-    String[] words = keyword.split(" ");
+    // 첫 번째 어절로 후보를 가져온 뒤 나머지 어절 모두 포함 여부로 필터링
+    List<Content> candidates =
+        contentRepository.findByTitleContainingIgnoreCaseOrderByPublishedAtDesc(
+            words[0], PageRequest.of(0, 100));
 
-    // 두 단어 이상: 첫 번째 + 두 번째 단어로 검색
-    List<Content> articles =
-        contentRepository.findByTitleContainingBothWords(words[0], words[1], top1);
-    if (!articles.isEmpty()) return articles;
+    List<Content> matched =
+        candidates.stream().filter(c -> containsAllWords(c.getTitle(), words, 1)).limit(1).toList();
 
-    // 세 단어 이상일 때: 두 번째 + 세 번째 단어로 재시도
-    if (words.length >= 3) {
-      articles = contentRepository.findByTitleContainingBothWords(words[1], words[2], top1);
-      if (!articles.isEmpty()) return articles;
-    }
+    if (!matched.isEmpty()) return matched;
 
-    // 최종 폴백: 첫 번째 단어만으로 검색
+    // 폴백: 첫 번째 어절만으로 검색
     return contentRepository.findByTitleContainingIgnoreCaseOrderByPublishedAtDesc(words[0], top1);
+  }
+
+  private boolean containsAllWords(String title, String[] words, int fromIndex) {
+    String lowerTitle = title.toLowerCase();
+    for (int i = fromIndex; i < words.length; i++) {
+      if (!lowerTitle.contains(words[i].toLowerCase())) return false;
+    }
+    return true;
   }
 
   private String buildKeywordPrompt(Map<String, Content> keywordToContent) {

@@ -19,12 +19,14 @@ import com.sku.aissue.domain.dto.response.ArticleCritiqueResponse;
 import com.sku.aissue.domain.dto.response.ContentResponse;
 import com.sku.aissue.domain.dto.response.HotTopicResponse;
 import com.sku.aissue.domain.dto.response.NewsItemResponse;
+import com.sku.aissue.domain.dto.response.PopularKeywordResponse;
 import com.sku.aissue.domain.dto.response.TrendingContentResponse;
 import com.sku.aissue.domain.dto.response.TrendingKeywordResponse;
 import com.sku.aissue.domain.entity.PeriodType;
 import com.sku.aissue.domain.entity.Subscription;
 import com.sku.aissue.domain.entity.TrendingKeyword;
 import com.sku.aissue.domain.repository.ContentAnalysisRepository;
+import com.sku.aissue.domain.repository.ContentRepository;
 import com.sku.aissue.domain.repository.SubscriptionRepository;
 import com.sku.aissue.domain.repository.TrendingKeywordRepository;
 import com.sku.aissue.domain.service.ArticleCritiqueService;
@@ -53,6 +55,7 @@ public class ContentControllerImpl implements ContentController {
   private final ArticleExtractor articleExtractor;
   private final TrendingKeywordRepository trendingKeywordRepository;
   private final ContentAnalysisRepository contentAnalysisRepository;
+  private final ContentRepository contentRepository;
   private final SubscriptionRepository subscriptionRepository;
   private final NotificationServiceClient notificationServiceClient;
 
@@ -141,7 +144,17 @@ public class ContentControllerImpl implements ContentController {
       @AuthenticationPrincipal String username) {
     List<AnalysisHistoryResponse> history =
         contentAnalysisRepository.findByUserIdOrderByAnalyzedAtDesc(username).stream()
-            .map(AnalysisHistoryResponse::from)
+            .map(
+                analysis -> {
+                  Long contentId =
+                      analysis.getUrl() != null
+                          ? contentRepository
+                              .findFirstByUrl(analysis.getUrl())
+                              .map(com.sku.aissue.domain.entity.Content::getId)
+                              .orElse(null)
+                          : null;
+                  return AnalysisHistoryResponse.from(analysis, contentId);
+                })
             .toList();
     return ResponseEntity.ok(BaseResponse.success(history));
   }
@@ -151,6 +164,20 @@ public class ContentControllerImpl implements ContentController {
       String keyword, Long cursor, int size) {
     return ResponseEntity.ok(
         BaseResponse.success(contentQueryService.getKeywordNews(keyword, cursor, size)));
+  }
+
+  @Override
+  public ResponseEntity<BaseResponse<List<PopularKeywordResponse>>> getPopularKeywords() {
+    List<PopularKeywordResponse> result =
+        notificationServiceClient.getPopularKeywords().stream()
+            .map(
+                info ->
+                    PopularKeywordResponse.builder()
+                        .keyword(info.keyword())
+                        .subscriberCount(info.subscriberCount())
+                        .build())
+            .toList();
+    return ResponseEntity.ok(BaseResponse.success(result));
   }
 
   @Override

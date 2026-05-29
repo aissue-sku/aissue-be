@@ -44,6 +44,8 @@ public interface ContentRepository extends JpaRepository<Content, Long> {
   List<Content> findByTitleContainingBothWords(
       @Param("word1") String word1, @Param("word2") String word2, Pageable pageable);
 
+  Optional<Content> findFirstByUrl(String url);
+
   // 이미지 미생성 기사 조회 (배치 처리용)
   List<Content> findByImageUrlIsNullOrderByCollectedAtDesc(Pageable pageable);
 }

@@ -10,6 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import com.sku.aissue.exception.model.BaseErrorCode;
@@ -78,6 +79,14 @@ public class GlobalExceptionHandler {
     log.debug("정적 리소스 없음: {}", ex.getMessage());
     return ResponseEntity.status(HttpStatus.NOT_FOUND)
         .body(BaseResponse.error(404, "리소스를 찾을 수 없습니다."));
+  }
+
+  @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+  public ResponseEntity<BaseResponse<Object>> handleTypeMismatch(
+      MethodArgumentTypeMismatchException ex) {
+    log.warn("잘못된 경로 파라미터: {} = {}", ex.getName(), ex.getValue());
+    return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+        .body(BaseResponse.error(400, "잘못된 요청입니다: " + ex.getName() + " 값이 올바르지 않습니다."));
   }
 
   /**

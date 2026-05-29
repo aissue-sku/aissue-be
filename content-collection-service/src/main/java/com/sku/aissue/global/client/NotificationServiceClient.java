@@ -3,8 +3,11 @@
  */
 package com.sku.aissue.global.client;
 
+import java.util.Collections;
 import java.util.List;
 
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
@@ -43,6 +46,24 @@ public class NotificationServiceClient {
       log.error("알림 서비스 호출 실패 (direct) - error: {}", e.getMessage());
     }
   }
+
+  public List<PopularKeywordInfo> getPopularKeywords() {
+    try {
+      var response =
+          restTemplate.exchange(
+              "http://notification-service/internal/notifications/popular-keywords",
+              HttpMethod.GET,
+              null,
+              new ParameterizedTypeReference<List<PopularKeywordInfo>>() {});
+      List<PopularKeywordInfo> body = response.getBody();
+      return body != null ? body : Collections.emptyList();
+    } catch (Exception e) {
+      log.error("인기 키워드 조회 실패 - error: {}", e.getMessage());
+      return Collections.emptyList();
+    }
+  }
+
+  public record PopularKeywordInfo(String keyword, long subscriberCount) {}
 
   public record CardInfo(String title, String url, Long contentId, List<String> keywords) {}
 

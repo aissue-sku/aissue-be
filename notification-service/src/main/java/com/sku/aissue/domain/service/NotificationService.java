@@ -9,6 +9,7 @@ import com.sku.aissue.domain.dto.request.DirectNotificationRequest;
 import com.sku.aissue.domain.dto.request.NotificationMatchRequest;
 import com.sku.aissue.domain.dto.request.SubscribeRequest;
 import com.sku.aissue.domain.dto.response.NotificationResponse;
+import com.sku.aissue.domain.dto.response.PopularKeywordResponse;
 import com.sku.aissue.domain.dto.response.SubscriptionResponse;
 
 public interface NotificationService {
@@ -34,4 +35,6 @@ public interface NotificationService {
   void matchAndNotify(NotificationMatchRequest request);
 
   void sendDirect(DirectNotificationRequest request);
+
+  List<PopularKeywordResponse> getPopularKeywords();
 }

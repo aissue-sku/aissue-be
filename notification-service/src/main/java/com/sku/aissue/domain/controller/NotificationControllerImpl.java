@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.sku.aissue.domain.dto.request.SubscribeRequest;
 import com.sku.aissue.domain.dto.response.NotificationResponse;
+import com.sku.aissue.domain.dto.response.PopularKeywordResponse;
 import com.sku.aissue.domain.dto.response.SubscriptionResponse;
 import com.sku.aissue.domain.service.NotificationService;
 import com.sku.aissue.response.BaseResponse;
@@ -77,5 +78,10 @@ public class NotificationControllerImpl implements NotificationController {
   public ResponseEntity<BaseResponse<Void>> deleteReadNotifications(String userId) {
     notificationService.deleteReadNotifications(userId);
     return ResponseEntity.ok(BaseResponse.success(200, "읽은 알림 삭제 완료", null));
+  }
+
+  @Override
+  public ResponseEntity<BaseResponse<List<PopularKeywordResponse>>> getPopularKeywords() {
+    return ResponseEntity.ok(BaseResponse.success(notificationService.getPopularKeywords()));
   }
 }
