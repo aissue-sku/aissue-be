@@ -31,7 +31,9 @@ import com.sku.aissue.domain.repository.ContentRepository;
 import com.sku.aissue.domain.repository.IssueCardRepository;
 import com.sku.aissue.domain.repository.TrendingKeywordRepository;
 import com.sku.aissue.exception.CustomException;
+import com.sku.aissue.global.client.NotificationServiceClient;
 import com.sku.aissue.global.client.OpenAiClient;
+import com.sku.aissue.global.client.QdrantClient;
 import com.sku.aissue.global.s3.S3ImageService;
 
 import lombok.RequiredArgsConstructor;
@@ -98,6 +100,8 @@ public class IssueCardService {
   private final TrendingKeywordRepository trendingKeywordRepository;
   private final ContentRepository contentRepository;
   private final OpenAiClient openAiClient;
+  private final QdrantClient qdrantClient;
+  private final NotificationServiceClient notificationServiceClient;
   private final ObjectMapper objectMapper;
   private final S3ImageService s3ImageService;
   private final ArticleCritiqueService articleCritiqueService;
@@ -117,23 +121,53 @@ public class IssueCardService {
     return cards.stream().map(this::toResponse).toList();
   }
 
+  public List<IssueCardResponse> getPersonalizedCards(String username) {
+    if (username == null) {
+      return getIssueCards();
+    }
+
+    List<String> subscribedKeywords = notificationServiceClient.getUserSubscribedKeywords(username);
+    if (subscribedKeywords.isEmpty()) {
+      return getIssueCards();
+    }
+
+    // 구독 키워드 카드 먼저, 나머지 최신 카드로 채움
+    List<IssueCard> subscribed = issueCardRepository.findLatestByKeywords(subscribedKeywords);
+    List<IssueCard> all = issueCardRepository.findLatest();
+
+    java.util.Set<Long> subscribedIds =
+        subscribed.stream().map(IssueCard::getId).collect(java.util.stream.Collectors.toSet());
+
+    List<IssueCard> merged = new java.util.ArrayList<>(subscribed);
+    all.stream().filter(c -> !subscribedIds.contains(c.getId())).forEach(merged::add);
+
+    log.info(
+        "개인화 이슈 카드 조회 - username: {}, 구독 매칭: {}개, 전체: {}개",
+        username,
+        subscribed.size(),
+        merged.size());
+
+    return merged.stream().map(this::toResponse).toList();
+  }
+
   @Transactional
   @CacheEvict(value = "issueCards", allEntries = true)
   public void generateAndSaveByHotTopics() {
     log.info("키워드 기반 이슈 카드 생성 시작");
 
-    List<TrendingKeyword> keywords = trendingKeywordRepository.findLatest();
+    // 급상승 키워드 + 인기 구독 키워드 병합 (중복 제거, 급상승 우선)
+    List<String> keywords = buildKeywordList();
     if (keywords.isEmpty()) {
-      log.info("저장된 급상승 키워드 없음 - 이슈 카드 생성 스킵");
+      log.info("처리할 키워드 없음 - 이슈 카드 생성 스킵");
       return;
     }
 
-    // 키워드별 대표 기사 1개씩 조회
+    // 키워드별 대표 기사 1개씩 조회 (RAG: Qdrant 벡터 검색 우선)
     Map<String, Content> keywordToContent = new LinkedHashMap<>();
-    for (TrendingKeyword kw : keywords) {
-      List<Content> articles = findArticleForKeyword(kw.getKeyword());
+    for (String keyword : keywords) {
+      List<Content> articles = findArticleForKeyword(keyword);
       if (!articles.isEmpty()) {
-        keywordToContent.put(kw.getKeyword(), articles.get(0));
+        keywordToContent.put(keyword, articles.get(0));
       }
     }
 
@@ -151,6 +185,12 @@ public class IssueCardService {
             .filter(c -> c.getUrl() != null)
             .collect(Collectors.toMap(Content::getUrl, c -> c, (a, b) -> a));
 
+    // url → 해당 카드를 생성한 키워드 역방향 매핑
+    Map<String, String> urlToKeyword =
+        keywordToContent.entrySet().stream()
+            .filter(e -> e.getValue().getUrl() != null)
+            .collect(Collectors.toMap(e -> e.getValue().getUrl(), Map.Entry::getKey, (a, b) -> a));
+
     LocalDateTime snapshotAt = LocalDateTime.now();
     AtomicInteger rank = new AtomicInteger(1);
 
@@ -159,6 +199,7 @@ public class IssueCardService {
             .map(
                 card -> {
                   Content content = urlToContent.get(card.sourceUrl());
+                  String cardKeyword = urlToKeyword.get(card.sourceUrl());
                   // TODO: 테스트 완료 후 주석 해제
                   // String imageUrl = generateImageSafely(card.imagePrompt());
                   String imageUrl = null;
@@ -173,6 +214,7 @@ public class IssueCardService {
                       .publishedAt(content != null ? content.getPublishedAt() : null)
                       .snapshotAt(snapshotAt)
                       .rankOrder(rank.getAndIncrement())
+                      .keyword(cardKeyword)
                       .build();
                 })
             .toList();
@@ -219,7 +261,62 @@ public class IssueCardService {
         .build();
   }
 
+  private List<String> buildKeywordList() {
+    // 급상승 키워드
+    List<String> trending =
+        trendingKeywordRepository.findLatest().stream().map(TrendingKeyword::getKeyword).toList();
+
+    // 인기 구독 키워드
+    List<String> subscribed;
+    try {
+      subscribed =
+          notificationServiceClient.getPopularKeywords().stream()
+              .map(NotificationServiceClient.PopularKeywordInfo::keyword)
+              .toList();
+    } catch (Exception e) {
+      log.warn("구독 키워드 조회 실패 - error: {}", e.getMessage());
+      subscribed = List.of();
+    }
+
+    // 급상승 키워드 우선, 구독 키워드 중 중복 제거 후 추가
+    List<String> result = new java.util.ArrayList<>(trending);
+    for (String kw : subscribed) {
+      if (!result.contains(kw)) result.add(kw);
+    }
+
+    log.info(
+        "카드 생성 키워드 - 급상승: {}개, 구독: {}개, 합계: {}개",
+        trending.size(),
+        subscribed.size(),
+        result.size());
+    return result;
+  }
+
   private List<Content> findArticleForKeyword(String keyword) {
+    // RAG: Qdrant 벡터 검색 우선
+    try {
+      List<Float> vector = openAiClient.embed(keyword);
+      List<Long> ids = qdrantClient.search(vector, 3);
+      if (!ids.isEmpty()) {
+        Map<Long, Content> contentMap =
+            contentRepository.findAllById(ids).stream()
+                .collect(Collectors.toMap(Content::getId, c -> c));
+        // Qdrant 유사도 순서 유지 (score 높은 순)
+        List<Content> ranked = ids.stream().map(contentMap::get).filter(c -> c != null).toList();
+        if (!ranked.isEmpty()) {
+          log.debug("Qdrant 검색 성공 - keyword: {}, hits: {}", keyword, ranked.size());
+          return List.of(ranked.get(0));
+        }
+      }
+    } catch (Exception e) {
+      log.warn("Qdrant 검색 실패, 텍스트 검색으로 폴백 - keyword: {}, error: {}", keyword, e.getMessage());
+    }
+
+    // 폴백: 기존 텍스트 검색
+    return findArticleByTextMatch(keyword);
+  }
+
+  private List<Content> findArticleByTextMatch(String keyword) {
     PageRequest top1 = PageRequest.of(0, 1);
     String[] words = keyword.trim().split("\\s+");
 
@@ -227,7 +324,6 @@ public class IssueCardService {
       return contentRepository.findByTitleContainingIgnoreCaseOrderByPublishedAtDesc(keyword, top1);
     }
 
-    // 첫 번째 어절로 후보를 가져온 뒤 나머지 어절 모두 포함 여부로 필터링
     List<Content> candidates =
         contentRepository.findByTitleContainingIgnoreCaseOrderByPublishedAtDesc(
             words[0], PageRequest.of(0, 100));
@@ -237,7 +333,6 @@ public class IssueCardService {
 
     if (!matched.isEmpty()) return matched;
 
-    // 폴백: 첫 번째 어절만으로 검색
     return contentRepository.findByTitleContainingIgnoreCaseOrderByPublishedAtDesc(words[0], top1);
   }
 

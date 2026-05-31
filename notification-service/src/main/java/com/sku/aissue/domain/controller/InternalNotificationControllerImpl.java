@@ -37,4 +37,11 @@ public class InternalNotificationControllerImpl implements InternalNotificationC
   public ResponseEntity<List<PopularKeywordResponse>> getPopularKeywords() {
     return ResponseEntity.ok(notificationService.getPopularKeywords());
   }
+
+  @Override
+  public ResponseEntity<List<String>> getUserSubscribedKeywords(String userId) {
+    List<String> keywords =
+        notificationService.getSubscriptions(userId).stream().map(sub -> sub.getKeyword()).toList();
+    return ResponseEntity.ok(keywords);
+  }
 }

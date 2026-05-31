@@ -77,5 +77,6 @@ public interface IssueCardController {
                           """)
                 }))
   })
-  ResponseEntity<BaseResponse<List<IssueCardResponse>>> getIssueCards();
+  ResponseEntity<BaseResponse<List<IssueCardResponse>>> getIssueCards(
+      @org.springframework.security.core.annotation.AuthenticationPrincipal String username);
 }

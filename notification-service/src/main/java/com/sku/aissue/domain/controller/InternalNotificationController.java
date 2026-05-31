@@ -29,4 +29,8 @@ public interface InternalNotificationController {
 
   @GetMapping("/popular-keywords")
   ResponseEntity<List<PopularKeywordResponse>> getPopularKeywords();
+
+  @GetMapping("/subscriptions/{userId}")
+  ResponseEntity<List<String>> getUserSubscribedKeywords(
+      @org.springframework.web.bind.annotation.PathVariable String userId);
 }

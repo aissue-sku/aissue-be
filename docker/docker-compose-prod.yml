@@ -113,6 +113,17 @@ services:
       - aissue-network
     restart: unless-stopped
 
+  qdrant:
+    image: qdrant/qdrant:v1.9.7
+    container_name: qdrant
+    expose:
+      - "6333"
+    volumes:
+      - qdrant-data:/qdrant/storage
+    networks:
+      - aissue-network
+    restart: unless-stopped
+
   content-collection-service:
     image: ${DOCKER_USERNAME}/aissue-content-collection-service:latest
     container_name: content-collection-service
@@ -132,6 +143,8 @@ services:
         condition: service_healthy
       mysql:
         condition: service_healthy
+      qdrant:
+        condition: service_started
     networks:
       - aissue-network
     restart: unless-stopped
@@ -162,3 +175,6 @@ services:
 networks:
   aissue-network:
     driver: bridge
+
+volumes:
+  qdrant-data:

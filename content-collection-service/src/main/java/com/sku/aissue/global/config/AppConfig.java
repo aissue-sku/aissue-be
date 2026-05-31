@@ -19,7 +19,8 @@ import org.springframework.web.reactive.function.client.WebClient;
   NaverApiProperties.class,
   RssFeedProperties.class,
   OpenAiProperties.class,
-  S3Properties.class
+  S3Properties.class,
+  QdrantProperties.class
 })
 public class AppConfig {
 
@@ -32,6 +33,16 @@ public class AppConfig {
   @LoadBalanced
   public RestTemplate restTemplate() {
     return new RestTemplate();
+  }
+
+  @Bean("qdrantWebClient")
+  public WebClient qdrantWebClient(QdrantProperties props) {
+    return WebClient.builder()
+        .baseUrl(props.getUrl())
+        .defaultHeader(
+            org.springframework.http.HttpHeaders.CONTENT_TYPE,
+            org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
+        .build();
   }
 
   @Bean("openAiWebClient")

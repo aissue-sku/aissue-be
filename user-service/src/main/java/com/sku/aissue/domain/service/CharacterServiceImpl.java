@@ -103,7 +103,7 @@ public class CharacterServiceImpl implements CharacterService {
         user.getPoints());
 
     notificationServiceClient.sendDirect(
-        String.valueOf(user.getId()),
+        user.getUsername(),
         "포인트",
         String.format(
             "'%s' 구매 완료! -%d포인트 (잔여: %d포인트)",

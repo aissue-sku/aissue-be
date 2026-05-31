@@ -288,6 +288,14 @@ public interface ContentController {
   @ApiResponses({@ApiResponse(responseCode = "200", description = "갱신 성공")})
   ResponseEntity<BaseResponse<List<HotTopicResponse>>> refreshHotTopics();
 
+  @PostMapping("/embed/all")
+  @SecurityRequirements
+  @Operation(
+      summary = "전체 기사 일괄 임베딩 (RAG 초기화)",
+      description = "DB에 저장된 전체 기사를 Qdrant에 임베딩합니다. 비동기로 처리되며 즉시 반환됩니다.")
+  @ApiResponses({@ApiResponse(responseCode = "200", description = "임베딩 시작됨")})
+  ResponseEntity<BaseResponse<Void>> embedAllArticles();
+
   @PostMapping("/submit")
   @Operation(
       summary = "콘텐츠 제출 (신뢰도 분석 요청)",

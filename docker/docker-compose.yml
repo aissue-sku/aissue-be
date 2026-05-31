@@ -70,6 +70,17 @@ services:
       - aissue-network
     restart: unless-stopped
 
+  qdrant:
+    image: qdrant/qdrant:v1.9.7
+    container_name: qdrant
+    expose:
+      - "6333"
+    volumes:
+      - qdrant-data:/qdrant/storage
+    networks:
+      - aissue-network
+    restart: unless-stopped
+
   grafana:
     image: grafana/grafana:11.1.0
     container_name: grafana
@@ -98,3 +109,4 @@ volumes:
   redis-data:
   prometheus-data:
   grafana-data:
+  qdrant-data:

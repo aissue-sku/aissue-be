@@ -6,6 +6,7 @@ package com.sku.aissue.domain.service;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
 
@@ -36,33 +37,32 @@ public class ContentSaveService {
   }
 
   @Transactional
-  public int saveAll(List<CollectedContentDto> dtos) {
+  public List<Content> saveAll(List<CollectedContentDto> dtos) {
     log.info("콘텐츠 저장 요청 시작 - 전체: {}건", dtos.size());
-    int savedCount = 0;
+    List<Content> saved = new ArrayList<>();
 
     for (CollectedContentDto dto : dtos) {
       try {
-        savedCount += saveIfNotDuplicate(dto);
+        Content content = saveIfNotDuplicate(dto);
+        if (content != null) saved.add(content);
       } catch (Exception e) {
         log.info("콘텐츠 저장 실패 - title: {}, error: {}", dto.getTitle(), e.getMessage());
       }
     }
 
-    log.info("콘텐츠 저장 완료 - 전체: {}건, 신규 저장: {}건", dtos.size(), savedCount);
-    return savedCount;
+    log.info("콘텐츠 저장 완료 - 전체: {}건, 신규 저장: {}건", dtos.size(), saved.size());
+    return saved;
   }
 
-  private int saveIfNotDuplicate(CollectedContentDto dto) {
-    // URL이 없는 경우 제목으로 해시
+  private Content saveIfNotDuplicate(CollectedContentDto dto) {
     String hashTarget = dto.getUrl() != null ? dto.getUrl() : dto.getTitle();
     String urlHash = sha256(hashTarget);
 
     if (contentRepository.existsByUrlHash(urlHash)) {
-      return 0;
+      return null;
     }
 
-    contentRepository.save(toEntity(dto, urlHash));
-    return 1;
+    return contentRepository.save(toEntity(dto, urlHash));
   }
 
   private Content toEntity(CollectedContentDto dto, String urlHash) {

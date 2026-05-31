@@ -47,6 +47,22 @@ public class NotificationServiceClient {
     }
   }
 
+  public List<String> getUserSubscribedKeywords(String userId) {
+    try {
+      var response =
+          restTemplate.exchange(
+              "http://notification-service/internal/notifications/subscriptions/" + userId,
+              HttpMethod.GET,
+              null,
+              new ParameterizedTypeReference<List<String>>() {});
+      List<String> body = response.getBody();
+      return body != null ? body : Collections.emptyList();
+    } catch (Exception e) {
+      log.warn("사용자 구독 키워드 조회 실패 - userId: {}, error: {}", userId, e.getMessage());
+      return Collections.emptyList();
+    }
+  }
+
   public List<PopularKeywordInfo> getPopularKeywords() {
     try {
       var response =

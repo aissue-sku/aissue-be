@@ -59,4 +59,8 @@ public class IssueCard {
 
   @Column(length = 150)
   private String teaser;
+
+  // 이 카드를 생성한 기준 키워드
+  @Column(length = 100)
+  private String keyword;
 }

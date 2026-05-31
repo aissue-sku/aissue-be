@@ -6,6 +6,7 @@ package com.sku.aissue.domain.controller;
 import java.util.List;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.sku.aissue.domain.dto.response.IssueCardResponse;
@@ -21,7 +22,12 @@ public class IssueCardControllerImpl implements IssueCardController {
   private final IssueCardService issueCardService;
 
   @Override
-  public ResponseEntity<BaseResponse<List<IssueCardResponse>>> getIssueCards() {
-    return ResponseEntity.ok(BaseResponse.success(issueCardService.getIssueCards()));
+  public ResponseEntity<BaseResponse<List<IssueCardResponse>>> getIssueCards(
+      @AuthenticationPrincipal String username) {
+    List<IssueCardResponse> cards =
+        username != null
+            ? issueCardService.getPersonalizedCards(username)
+            : issueCardService.getIssueCards();
+    return ResponseEntity.ok(BaseResponse.success(cards));
   }
 }

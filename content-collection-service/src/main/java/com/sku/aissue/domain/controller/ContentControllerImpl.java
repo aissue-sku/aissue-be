@@ -30,6 +30,7 @@ import com.sku.aissue.domain.repository.ContentRepository;
 import com.sku.aissue.domain.repository.SubscriptionRepository;
 import com.sku.aissue.domain.repository.TrendingKeywordRepository;
 import com.sku.aissue.domain.service.ArticleCritiqueService;
+import com.sku.aissue.domain.service.ArticleEmbeddingService;
 import com.sku.aissue.domain.service.ArticleExtractor;
 import com.sku.aissue.domain.service.ContentAnalysisService;
 import com.sku.aissue.domain.service.ContentQueryService;
@@ -53,6 +54,7 @@ public class ContentControllerImpl implements ContentController {
   private final ArticleCritiqueService articleCritiqueService;
   private final ContentAnalysisService contentAnalysisService;
   private final ArticleExtractor articleExtractor;
+  private final ArticleEmbeddingService articleEmbeddingService;
   private final TrendingKeywordRepository trendingKeywordRepository;
   private final ContentAnalysisRepository contentAnalysisRepository;
   private final ContentRepository contentRepository;
@@ -70,6 +72,12 @@ public class ContentControllerImpl implements ContentController {
   public ResponseEntity<BaseResponse<Void>> refreshIssueCards() {
     issueCardService.generateAndSaveByHotTopics();
     return ResponseEntity.ok(BaseResponse.success(null));
+  }
+
+  @Override
+  public ResponseEntity<BaseResponse<Void>> embedAllArticles() {
+    articleEmbeddingService.embedAllExisting();
+    return ResponseEntity.ok(BaseResponse.success(200, "전체 기사 임베딩이 백그라운드에서 시작되었습니다.", null));
   }
 
   @Override

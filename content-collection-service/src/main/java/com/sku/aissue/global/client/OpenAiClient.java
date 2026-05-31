@@ -76,6 +76,28 @@ public class OpenAiClient {
     }
   }
 
+  public List<Float> embed(String text) {
+    EmbedRequest request = new EmbedRequest("text-embedding-3-small", text);
+    try {
+      EmbedResponse response =
+          openAiWebClient
+              .post()
+              .uri("/v1/embeddings")
+              .bodyValue(request)
+              .retrieve()
+              .bodyToMono(EmbedResponse.class)
+              .block();
+
+      if (response == null || response.getData() == null || response.getData().isEmpty()) {
+        throw new CustomException(AnalysisErrorCode.AI_API_ERROR);
+      }
+      return response.getData().get(0).getEmbedding();
+    } catch (org.springframework.web.reactive.function.client.WebClientResponseException e) {
+      log.error("임베딩 API 호출 실패 - status: {}", e.getStatusCode());
+      throw new CustomException(AnalysisErrorCode.AI_API_ERROR);
+    }
+  }
+
   public byte[] generateImage(String prompt) {
     ImageRequest request = new ImageRequest("gpt-image-1", prompt, 1, "1024x1024");
 
@@ -181,6 +203,29 @@ public class OpenAiClient {
       this.prompt = prompt;
       this.n = n;
       this.size = size;
+    }
+  }
+
+  @Getter
+  static class EmbedRequest {
+    private final String model;
+    private final String input;
+
+    EmbedRequest(String model, String input) {
+      this.model = model;
+      this.input = input;
+    }
+  }
+
+  @Getter
+  @NoArgsConstructor
+  static class EmbedResponse {
+    private List<EmbedData> data;
+
+    @Getter
+    @NoArgsConstructor
+    static class EmbedData {
+      private List<Float> embedding;
     }
   }
 

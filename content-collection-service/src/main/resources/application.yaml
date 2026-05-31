@@ -7,6 +7,10 @@ spring:
 server:
   port: 8083
 
+qdrant:
+  url: http://qdrant:6333
+  collection: articles
+
 management:
   endpoints:
     web:
