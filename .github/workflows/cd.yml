@@ -105,9 +105,8 @@ jobs:
             MYSQL_STATUS=$(docker inspect -f '{{.State.Status}}' mysql 2>/dev/null || echo "not_found")
 
             if [ "$MYSQL_STATUS" = "running" ]; then
-              echo "🟡 [PROD] 인프라 유지 → RabbitMQ 확인 후 Spring 서비스 재기동"
-              docker compose -f docker-compose.yml -f docker-compose-prod.yml up -d rabbitmq
-              docker compose -f docker-compose.yml -f docker-compose-prod.yml up -d --no-deps \
+              echo "🟡 [PROD] 인프라 유지 → Spring 서비스 재기동 (depends_on 순서 보장)"
+              docker compose -f docker-compose.yml -f docker-compose-prod.yml up -d \
                 config-server eureka-server gateway auth-service user-service content-collection-service notification-service ai-service
             else
               echo "🟢 [PROD] 전체 스택 기동"
