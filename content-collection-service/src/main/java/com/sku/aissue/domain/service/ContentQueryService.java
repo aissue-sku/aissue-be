@@ -5,27 +5,25 @@ package com.sku.aissue.domain.service;
 
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.sku.aissue.domain.dto.CollectedContentDto;
-import com.sku.aissue.domain.dto.request.ContentSubmitRequest;
-import com.sku.aissue.domain.dto.response.AnalysisScoreResponse;
 import com.sku.aissue.domain.dto.response.ContentResponse;
 import com.sku.aissue.domain.dto.response.NewsItemResponse;
 import com.sku.aissue.domain.dto.response.TrendingContentResponse;
 import com.sku.aissue.domain.entity.Content;
-import com.sku.aissue.domain.entity.ContentSource;
-import com.sku.aissue.domain.entity.ContentType;
 import com.sku.aissue.domain.entity.PeriodType;
 import com.sku.aissue.domain.repository.ContentRepository;
 import com.sku.aissue.domain.repository.TrendingSnapshotRepository;
 import com.sku.aissue.exception.CustomException;
 import com.sku.aissue.exception.GlobalErrorCode;
-import com.sku.aissue.global.client.NotificationServiceClient;
 import com.sku.aissue.global.page.InfiniteResponse;
 
 import lombok.RequiredArgsConstructor;
@@ -39,10 +37,6 @@ public class ContentQueryService {
 
   private final ContentRepository contentRepository;
   private final TrendingSnapshotRepository trendingSnapshotRepository;
-  private final ContentSaveService contentSaveService;
-  private final ArticleExtractor articleExtractor;
-  private final ContentAnalysisService contentAnalysisService;
-  private final NotificationServiceClient notificationServiceClient;
 
   public List<TrendingContentResponse> getTrending(PeriodType periodType) {
     log.info("트렌딩 조회 요청 시작 - periodType: {}", periodType);
@@ -84,10 +78,24 @@ public class ContentQueryService {
     log.info("키워드 뉴스 조회 - keyword: {}, cursor: {}, size: {}", keyword, cursor, size);
 
     long effectiveCursor = cursor != null ? cursor : Long.MAX_VALUE;
-    // size+1 개 조회로 hasNext 판단
-    List<Content> fetched =
-        contentRepository.findByKeywordBeforeCursor(
-            keyword, effectiveCursor, PageRequest.of(0, size + 1));
+    String[] words = keyword.trim().split("\\s+");
+
+    List<Content> fetched;
+    if (words.length == 1) {
+      fetched =
+          contentRepository.findByKeywordBeforeCursor(
+              keyword, effectiveCursor, PageRequest.of(0, size + 1));
+    } else {
+      Map<Long, Content> seen = new LinkedHashMap<>();
+      for (String word : words) {
+        contentRepository
+            .findByKeywordBeforeCursor(word, effectiveCursor, PageRequest.of(0, size + 1))
+            .forEach(c -> seen.putIfAbsent(c.getId(), c));
+      }
+      fetched = new ArrayList<>(seen.values());
+      fetched.sort(Comparator.comparingLong(Content::getId).reversed());
+      if (fetched.size() > size + 1) fetched = fetched.subList(0, size + 1);
+    }
 
     boolean hasNext = fetched.size() > size;
     List<Content> pageContents = hasNext ? fetched.subList(0, size) : fetched;
@@ -129,60 +137,5 @@ public class ContentQueryService {
     if (hours < 24) return hours + "시간 전";
     long days = hours / 24;
     return days + "일 전";
-  }
-
-  @Transactional
-  public AnalysisScoreResponse submit(ContentSubmitRequest request, String username) {
-    log.info("콘텐츠 분석 요청 시작 - username: {}, type: {}", username, request.getType());
-    CollectedContentDto dto = buildSubmittedContent(request, username);
-    Content content = contentSaveService.findOrSave(dto);
-
-    AnalysisScoreResponse result =
-        contentAnalysisService.analyze(dto.getTitle(), dto.getUrl(), dto.getBody(), username);
-    log.info("콘텐츠 분석 성공 - username: {}, totalScore: {}", username, result.getTotalScore());
-
-    notificationServiceClient.sendDirect(username, dto.getTitle(), dto.getUrl(), content.getId());
-
-    return result.toBuilder().contentId(content.getId()).build();
-  }
-
-  private CollectedContentDto buildSubmittedContent(ContentSubmitRequest request, String username) {
-    if (request.getType() == ContentSubmitRequest.SubmitType.URL) {
-      return buildFromUrl(request.getContent(), username);
-    }
-    return buildFromText(request.getContent(), username);
-  }
-
-  private CollectedContentDto buildFromUrl(String url, String username) {
-    ArticleExtractor.ExtractedArticle article =
-        articleExtractor.extract(url); // 실패 시 CustomException 전파
-
-    String title = (article.title() != null && !article.title().isBlank()) ? article.title() : url;
-    String body = article.body();
-    String source = username != null ? username : "anonymous";
-
-    return CollectedContentDto.builder()
-        .title(title)
-        .body(body)
-        .url(url)
-        .source(source)
-        .contentType(ContentType.ISSUE)
-        .contentSource(ContentSource.USER_SUBMITTED)
-        .publishedAt(java.time.LocalDateTime.now())
-        .build();
-  }
-
-  private CollectedContentDto buildFromText(String text, String username) {
-    String title = text.length() > 50 ? text.substring(0, 50) + "..." : text;
-    String source = username != null ? username : "anonymous";
-
-    return CollectedContentDto.builder()
-        .title(title)
-        .body(text)
-        .source(source)
-        .contentType(ContentType.ISSUE)
-        .contentSource(ContentSource.USER_SUBMITTED)
-        .publishedAt(java.time.LocalDateTime.now())
-        .build();
   }
 }

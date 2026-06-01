@@ -5,16 +5,19 @@ package com.sku.aissue.domain.service;
 
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,17 +26,16 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sku.aissue.domain.dto.response.IssueCardResponse;
-import com.sku.aissue.domain.entity.Content;
 import com.sku.aissue.domain.entity.IssueCard;
-import com.sku.aissue.domain.entity.TrendingKeyword;
 import com.sku.aissue.domain.exception.AnalysisErrorCode;
-import com.sku.aissue.domain.repository.ContentRepository;
 import com.sku.aissue.domain.repository.IssueCardRepository;
-import com.sku.aissue.domain.repository.TrendingKeywordRepository;
 import com.sku.aissue.exception.CustomException;
+import com.sku.aissue.global.client.ContentServiceClient;
+import com.sku.aissue.global.client.ContentServiceClient.ContentInfo;
 import com.sku.aissue.global.client.NotificationServiceClient;
 import com.sku.aissue.global.client.OpenAiClient;
 import com.sku.aissue.global.client.QdrantClient;
+import com.sku.aissue.global.messaging.CardEventPublisher;
 import com.sku.aissue.global.s3.S3ImageService;
 
 import lombok.RequiredArgsConstructor;
@@ -46,6 +48,8 @@ import lombok.extern.slf4j.Slf4j;
 public class IssueCardService {
 
   private static final int SNAPSHOT_RETENTION_DAYS = 7;
+  private static final int TARGET_CARD_COUNT = 10;
+  private static final String FILLER_KEY_PREFIX = "__filler_";
 
   private static final String SYSTEM_PROMPT =
       """
@@ -78,11 +82,9 @@ public class IssueCardService {
       Teaser rules:
       - Must be a question (end with ?)
       - Hook raises the tension; teaser asks the unanswered question that makes readers click
-      - Examples: "진짜 피해자는 따로 있다고?", "왜 지금 이 뉴스가 터졌을까?", "당신의 지갑에도 영향이 올까?"
 
       category rules:
       - Choose exactly ONE from: 정치, 경제, 사회, 과학/IT, 문화/연예, 스포츠, 국제, 기타
-      - Base on the main topic of the article
 
       imagePrompt rules:
       - Describe a scene or concept that visually represents the topic
@@ -97,15 +99,15 @@ public class IssueCardService {
       """;
 
   private final IssueCardRepository issueCardRepository;
-  private final TrendingKeywordRepository trendingKeywordRepository;
-  private final ContentRepository contentRepository;
+  private final ContentServiceClient contentServiceClient;
+  private final NotificationServiceClient notificationServiceClient;
   private final OpenAiClient openAiClient;
   private final QdrantClient qdrantClient;
-  private final NotificationServiceClient notificationServiceClient;
   private final ObjectMapper objectMapper;
   private final S3ImageService s3ImageService;
   private final ArticleCritiqueService articleCritiqueService;
   private final ContentAnalysisService contentAnalysisService;
+  private final CardEventPublisher cardEventPublisher;
 
   @Cacheable(value = "issueCards", key = "'latest'")
   public List<IssueCardResponse> getIssueCards() {
@@ -122,23 +124,15 @@ public class IssueCardService {
   }
 
   public List<IssueCardResponse> getPersonalizedCards(String username) {
-    if (username == null) {
-      return getIssueCards();
-    }
+    if (username == null) return getIssueCards();
 
     List<String> subscribedKeywords = notificationServiceClient.getUserSubscribedKeywords(username);
-    if (subscribedKeywords.isEmpty()) {
-      return getIssueCards();
-    }
+    if (subscribedKeywords.isEmpty()) return getIssueCards();
 
-    // 구독 키워드 카드 먼저, 나머지 최신 카드로 채움
     List<IssueCard> subscribed = issueCardRepository.findLatestByKeywords(subscribedKeywords);
     List<IssueCard> all = issueCardRepository.findLatest();
-
-    java.util.Set<Long> subscribedIds =
-        subscribed.stream().map(IssueCard::getId).collect(java.util.stream.Collectors.toSet());
-
-    List<IssueCard> merged = new java.util.ArrayList<>(subscribed);
+    Set<Long> subscribedIds = subscribed.stream().map(IssueCard::getId).collect(Collectors.toSet());
+    List<IssueCard> merged = new ArrayList<>(subscribed);
     all.stream().filter(c -> !subscribedIds.contains(c.getId())).forEach(merged::add);
 
     log.info(
@@ -146,7 +140,6 @@ public class IssueCardService {
         username,
         subscribed.size(),
         merged.size());
-
     return merged.stream().map(this::toResponse).toList();
   }
 
@@ -155,21 +148,15 @@ public class IssueCardService {
   public void generateAndSaveByHotTopics() {
     log.info("키워드 기반 이슈 카드 생성 시작");
 
-    // 급상승 키워드 + 인기 구독 키워드 병합 (중복 제거, 급상승 우선)
     List<String> keywords = buildKeywordList();
     if (keywords.isEmpty()) {
       log.info("처리할 키워드 없음 - 이슈 카드 생성 스킵");
       return;
     }
 
-    // 키워드별 대표 기사 1개씩 조회 (RAG: Qdrant 벡터 검색 우선)
-    Map<String, Content> keywordToContent = new LinkedHashMap<>();
-    for (String keyword : keywords) {
-      List<Content> articles = findArticleForKeyword(keyword);
-      if (!articles.isEmpty()) {
-        keywordToContent.put(keyword, articles.get(0));
-      }
-    }
+    Map<String, ContentInfo> keywordToContent = collectKeywordArticles(keywords, TARGET_CARD_COUNT);
+
+    log.info("매칭된 키워드-기사 쌍: {}개 / 전체 {}개", keywordToContent.size(), keywords.size());
 
     if (keywordToContent.isEmpty()) {
       log.info("키워드에 매칭되는 기사 없음 - 이슈 카드 생성 스킵");
@@ -179,17 +166,17 @@ public class IssueCardService {
     String userPrompt = buildKeywordPrompt(keywordToContent);
     String aiResponse = openAiClient.chat(SYSTEM_PROMPT, userPrompt);
     List<GptCard> rawCards = parseGptResponse(aiResponse);
+    log.info("GPT 카드 파싱 결과: {}개", rawCards.size());
 
-    Map<String, Content> urlToContent =
+    Map<String, ContentInfo> urlToContent =
         keywordToContent.values().stream()
-            .filter(c -> c.getUrl() != null)
-            .collect(Collectors.toMap(Content::getUrl, c -> c, (a, b) -> a));
+            .filter(c -> c.url() != null)
+            .collect(Collectors.toMap(ContentInfo::url, c -> c, (a, b) -> a));
 
-    // url → 해당 카드를 생성한 키워드 역방향 매핑
     Map<String, String> urlToKeyword =
         keywordToContent.entrySet().stream()
-            .filter(e -> e.getValue().getUrl() != null)
-            .collect(Collectors.toMap(e -> e.getValue().getUrl(), Map.Entry::getKey, (a, b) -> a));
+            .filter(e -> e.getValue().url() != null && !e.getKey().startsWith(FILLER_KEY_PREFIX))
+            .collect(Collectors.toMap(e -> e.getValue().url(), Map.Entry::getKey, (a, b) -> a));
 
     LocalDateTime snapshotAt = LocalDateTime.now();
     AtomicInteger rank = new AtomicInteger(1);
@@ -198,10 +185,8 @@ public class IssueCardService {
         rawCards.stream()
             .map(
                 card -> {
-                  Content content = urlToContent.get(card.sourceUrl());
+                  ContentInfo content = urlToContent.get(card.sourceUrl());
                   String cardKeyword = urlToKeyword.get(card.sourceUrl());
-                  // TODO: 테스트 완료 후 주석 해제
-                  // String imageUrl = generateImageSafely(card.imagePrompt());
                   String imageUrl = null;
                   return IssueCard.builder()
                       .title(card.hook())
@@ -209,9 +194,9 @@ public class IssueCardService {
                       .imageUrl(imageUrl)
                       .tags(serializeTags(card.tags()))
                       .category(card.category() != null ? card.category() : "기타")
-                      .contentId(content != null ? content.getId() : null)
-                      .sourceUrl(content != null ? content.getUrl() : card.sourceUrl())
-                      .publishedAt(content != null ? content.getPublishedAt() : null)
+                      .contentId(content != null ? content.id() : null)
+                      .sourceUrl(content != null ? content.url() : card.sourceUrl())
+                      .publishedAt(content != null ? content.publishedAt() : null)
                       .snapshotAt(snapshotAt)
                       .rankOrder(rank.getAndIncrement())
                       .keyword(cardKeyword)
@@ -222,27 +207,41 @@ public class IssueCardService {
     List<IssueCard> savedCards = issueCardRepository.saveAll(entities);
     issueCardRepository.deleteBySnapshotAtBefore(snapshotAt.minusDays(SNAPSHOT_RETENTION_DAYS));
 
-    log.info("키워드 기반 이슈 카드 생성 완료 - {}개", savedCards.size());
+    log.info("공통 이슈 카드 생성 완료 - {}개", savedCards.size());
 
-    // 각 기사에 대한 비평·신뢰도 분석 사전 계산 (API 호출 시 DB에서 즉시 반환)
+    publishCardsGeneratedEvent(savedCards);
     preComputeAnalyses(keywordToContent);
   }
 
-  private void preComputeAnalyses(Map<String, Content> keywordToContent) {
+  private void publishCardsGeneratedEvent(List<IssueCard> cards) {
+    List<CardEventPublisher.CardInfo> cardInfos =
+        cards.stream()
+            .filter(c -> c.getSourceUrl() != null)
+            .map(
+                c ->
+                    new CardEventPublisher.CardInfo(
+                        c.getTitle(),
+                        c.getSourceUrl(),
+                        c.getContentId(),
+                        deserializeTags(c.getTags())))
+            .toList();
+    cardEventPublisher.publishCardsGenerated(cardInfos);
+  }
+
+  private void preComputeAnalyses(Map<String, ContentInfo> keywordToContent) {
     log.info("기사 분석 사전 계산 시작 - {}개 기사", keywordToContent.size());
-    for (Content content : keywordToContent.values()) {
-      if (content.getUrl() == null) continue;
+    for (ContentInfo content : keywordToContent.values()) {
+      if (content.url() == null) continue;
       try {
         articleCritiqueService.preComputeAndSave(
-            content.getTitle(), content.getBody(), content.getUrl(), content.getId());
+            content.title(), content.body(), content.url(), content.id());
       } catch (Exception e) {
-        log.error("비평 분석 사전 계산 오류 - url: {}, error: {}", content.getUrl(), e.getMessage());
+        log.error("비평 분석 사전 계산 오류 - url: {}, error: {}", content.url(), e.getMessage());
       }
       try {
-        contentAnalysisService.analyze(
-            content.getTitle(), content.getUrl(), content.getBody(), null);
+        contentAnalysisService.analyze(content.title(), content.url(), content.body(), null);
       } catch (Exception e) {
-        log.error("신뢰도 분석 사전 계산 오류 - url: {}, error: {}", content.getUrl(), e.getMessage());
+        log.error("신뢰도 분석 사전 계산 오류 - url: {}, error: {}", content.url(), e.getMessage());
       }
     }
     log.info("기사 분석 사전 계산 완료");
@@ -262,81 +261,96 @@ public class IssueCardService {
   }
 
   private List<String> buildKeywordList() {
-    // 급상승 키워드
-    List<String> trending =
-        trendingKeywordRepository.findLatest().stream().map(TrendingKeyword::getKeyword).toList();
+    List<String> trending = contentServiceClient.getHotKeywords();
+    log.info("카드 생성 키워드 - 급상승: {}개", trending.size());
+    return trending;
+  }
 
-    // 인기 구독 키워드
-    List<String> subscribed;
-    try {
-      subscribed =
-          notificationServiceClient.getPopularKeywords().stream()
-              .map(NotificationServiceClient.PopularKeywordInfo::keyword)
-              .toList();
-    } catch (Exception e) {
-      log.warn("구독 키워드 조회 실패 - error: {}", e.getMessage());
-      subscribed = List.of();
+  private Map<String, ContentInfo> collectKeywordArticles(List<String> keywords, int limit) {
+    Map<String, ContentInfo> result = new LinkedHashMap<>();
+    Set<String> usedUrls = new HashSet<>();
+
+    for (String keyword : keywords) {
+      if (result.size() >= limit) break;
+      ContentInfo article = findArticleForKeyword(keyword);
+      if (article == null) {
+        log.info("키워드 매칭 실패 - keyword: {}", keyword);
+        continue;
+      }
+      if (article.url() != null && !usedUrls.add(article.url())) continue;
+      result.put(keyword, article);
+      log.info("키워드 매칭 - keyword: {}, title: {}", keyword, article.title());
     }
 
-    // 급상승 키워드 우선, 구독 키워드 중 중복 제거 후 추가
-    List<String> result = new java.util.ArrayList<>(trending);
-    for (String kw : subscribed) {
-      if (!result.contains(kw)) result.add(kw);
+    if (result.size() < limit) {
+      fillWithRecentArticles(result, usedUrls, limit);
     }
 
-    log.info(
-        "카드 생성 키워드 - 급상승: {}개, 구독: {}개, 합계: {}개",
-        trending.size(),
-        subscribed.size(),
-        result.size());
     return result;
   }
 
-  private List<Content> findArticleForKeyword(String keyword) {
-    // RAG: Qdrant 벡터 검색 우선
+  private void fillWithRecentArticles(
+      Map<String, ContentInfo> result, Set<String> usedUrls, int limit) {
+    try {
+      ContentServiceClient.PagedContentInfo paged = contentServiceClient.findPaged(0, limit * 3);
+      int fillerIdx = 1;
+      for (ContentInfo content : paged.contents()) {
+        if (result.size() >= limit) break;
+        if (content.url() != null && !usedUrls.add(content.url())) continue;
+        result.put(FILLER_KEY_PREFIX + fillerIdx++, content);
+      }
+      log.info("최근 기사로 카드 보충 완료 - 총 {}개", result.size());
+    } catch (Exception e) {
+      log.warn("최근 기사 조회 실패 - 현재 {}개로 진행: {}", result.size(), e.getMessage());
+    }
+  }
+
+  private ContentInfo findArticleForKeyword(String keyword) {
     try {
       List<Float> vector = openAiClient.embed(keyword);
       List<Long> ids = qdrantClient.search(vector, 3);
       if (!ids.isEmpty()) {
-        Map<Long, Content> contentMap =
-            contentRepository.findAllById(ids).stream()
-                .collect(Collectors.toMap(Content::getId, c -> c));
-        // Qdrant 유사도 순서 유지 (score 높은 순)
-        List<Content> ranked = ids.stream().map(contentMap::get).filter(c -> c != null).toList();
-        if (!ranked.isEmpty()) {
-          log.debug("Qdrant 검색 성공 - keyword: {}, hits: {}", keyword, ranked.size());
-          return List.of(ranked.get(0));
+        List<ContentInfo> contents = contentServiceClient.findByIds(ids);
+        Map<Long, ContentInfo> contentMap =
+            contents.stream().collect(Collectors.toMap(ContentInfo::id, c -> c));
+        ContentInfo ranked =
+            ids.stream().map(contentMap::get).filter(c -> c != null).findFirst().orElse(null);
+        if (ranked != null) {
+          log.debug("Qdrant 검색 성공 - keyword: {}", keyword);
+          return ranked;
         }
       }
     } catch (Exception e) {
       log.warn("Qdrant 검색 실패, 텍스트 검색으로 폴백 - keyword: {}, error: {}", keyword, e.getMessage());
     }
 
-    // 폴백: 기존 텍스트 검색
     return findArticleByTextMatch(keyword);
   }
 
-  private List<Content> findArticleByTextMatch(String keyword) {
-    PageRequest top1 = PageRequest.of(0, 1);
+  private ContentInfo findArticleByTextMatch(String keyword) {
     String[] words = keyword.trim().split("\\s+");
 
     if (words.length == 1) {
-      return contentRepository.findByTitleContainingIgnoreCaseOrderByPublishedAtDesc(keyword, top1);
+      List<ContentInfo> results = contentServiceClient.findByTitle(keyword, 0, 1);
+      return results.isEmpty() ? null : results.get(0);
     }
 
-    List<Content> candidates =
-        contentRepository.findByTitleContainingIgnoreCaseOrderByPublishedAtDesc(
-            words[0], PageRequest.of(0, 100));
+    List<ContentInfo> candidates = contentServiceClient.findByTitle(words[0], 0, 100);
 
-    List<Content> matched =
-        candidates.stream().filter(c -> containsAllWords(c.getTitle(), words, 1)).limit(1).toList();
+    ContentInfo matched =
+        candidates.stream()
+            .filter(c -> containsAllWords(c.title(), words, 1))
+            .findFirst()
+            .orElse(null);
 
-    if (!matched.isEmpty()) return matched;
+    if (matched != null) return matched;
 
-    return contentRepository.findByTitleContainingIgnoreCaseOrderByPublishedAtDesc(words[0], top1);
+    List<ContentInfo> fallback = contentServiceClient.findByTitle(words[0], 0, 1);
+    return fallback.isEmpty() ? null : fallback.get(0);
   }
 
   private boolean containsAllWords(String title, String[] words, int fromIndex) {
+    if (title == null) return false;
     String lowerTitle = title.toLowerCase();
     for (int i = fromIndex; i < words.length; i++) {
       if (!lowerTitle.contains(words[i].toLowerCase())) return false;
@@ -344,21 +358,37 @@ public class IssueCardService {
     return true;
   }
 
-  private String buildKeywordPrompt(Map<String, Content> keywordToContent) {
+  private String buildKeywordPrompt(Map<String, ContentInfo> keywordToContent) {
     StringBuilder sb = new StringBuilder("다음 키워드별로 각각 카드 1개씩 생성해주세요:\n\n");
     int i = 1;
-    for (Map.Entry<String, Content> entry : keywordToContent.entrySet()) {
-      Content content = entry.getValue();
-      sb.append("키워드 ").append(i++).append(": ").append(entry.getKey()).append("\n");
+    for (Map.Entry<String, ContentInfo> entry : keywordToContent.entrySet()) {
+      ContentInfo content = entry.getValue();
+      String keyword =
+          entry.getKey().startsWith(FILLER_KEY_PREFIX)
+              ? extractFirstKeyword(content.title())
+              : entry.getKey();
+      sb.append("키워드 ")
+          .append(i++)
+          .append(": ")
+          .append(keyword != null ? keyword : "최신뉴스")
+          .append("\n");
       sb.append("관련 기사: [")
-          .append(content.getTitle())
+          .append(content.title())
           .append("] (출처: ")
-          .append(content.getSource())
+          .append(content.source())
           .append(") - URL: ")
-          .append(content.getUrl())
+          .append(content.url())
           .append("\n\n");
     }
     return sb.toString();
+  }
+
+  private String extractFirstKeyword(String title) {
+    if (title == null || title.isBlank()) return null;
+    return Arrays.stream(title.split("[^가-힣a-zA-Z0-9]+"))
+        .filter(w -> w.length() >= 2)
+        .findFirst()
+        .orElse(null);
   }
 
   private List<GptCard> parseGptResponse(String gptResponse) {
@@ -376,6 +406,7 @@ public class IssueCardService {
     }
   }
 
+  @SuppressWarnings("unused")
   private String generateImageSafely(String imagePrompt) {
     if (imagePrompt == null || imagePrompt.isBlank()) {
       return null;

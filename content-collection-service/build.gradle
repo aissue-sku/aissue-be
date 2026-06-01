@@ -12,23 +12,20 @@ dependencies {
   implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
   runtimeOnly 'com.mysql:mysql-connector-j'
 
-  // HTTP 클라이언트 (외부 API 호출)
-  implementation 'org.springframework.boot:spring-boot-starter-webflux'
-
   // RSS 파싱
   implementation 'com.rometools:rome:2.1.0'
 
-  // HTML 파싱 (URL 본문 추출)
-  implementation 'org.jsoup:jsoup:1.17.2'
-
-  // 캐시 (GPT API 호출 횟수 절약)
+  // 캐시
   implementation 'org.springframework.boot:spring-boot-starter-cache'
   implementation 'com.github.ben-manes.caffeine:caffeine'
-
-  // AWS S3
-  implementation "io.awspring.cloud:spring-cloud-aws-starter-s3:${springCloudAwsVersion}"
 
   // 서비스 디스커버리 + 중앙 설정
   implementation 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client'
   implementation 'org.springframework.cloud:spring-cloud-starter-config'
+
+  // 서킷 브레이커
+  implementation 'org.springframework.cloud:spring-cloud-starter-circuitbreaker-resilience4j'
+
+  // 메시지 큐
+  implementation 'org.springframework.boot:spring-boot-starter-amqp'
 }

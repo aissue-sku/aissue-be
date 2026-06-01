@@ -13,8 +13,13 @@ import java.util.List;
 import java.util.Locale;
 
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
-import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.sku.aissue.domain.dto.CollectedContentDto;
@@ -35,12 +40,13 @@ public class NaverNewsCollector implements ContentCollector {
   private static final DateTimeFormatter NAVER_DATE_FORMAT =
       DateTimeFormatter.ofPattern("EEE, dd MMM yyyy HH:mm:ss Z", Locale.ENGLISH);
 
-  private final WebClient webClient;
+  private final RestTemplate restTemplate;
   private final NaverApiProperties naverApiProperties;
 
   public NaverNewsCollector(
-      @Qualifier("webClient") WebClient webClient, NaverApiProperties naverApiProperties) {
-    this.webClient = webClient;
+      @Qualifier("externalRestTemplate") RestTemplate restTemplate,
+      NaverApiProperties naverApiProperties) {
+    this.restTemplate = restTemplate;
     this.naverApiProperties = naverApiProperties;
   }
 
@@ -59,27 +65,28 @@ public class NaverNewsCollector implements ContentCollector {
 
   private List<CollectedContentDto> fetchByKeyword(String keyword) {
     try {
-      NaverNewsResponse response =
-          webClient
-              .get()
-              .uri(
-                  naverApiProperties.getNewsUrl(),
-                  uri ->
-                      uri.queryParam("query", keyword)
-                          .queryParam("display", DISPLAY_COUNT)
-                          .queryParam("sort", "date")
-                          .build())
-              .header("X-Naver-Client-Id", naverApiProperties.getClientId())
-              .header("X-Naver-Client-Secret", naverApiProperties.getClientSecret())
-              .retrieve()
-              .bodyToMono(NaverNewsResponse.class)
-              .block();
+      URI uri =
+          UriComponentsBuilder.fromUriString(naverApiProperties.getNewsUrl())
+              .queryParam("query", keyword)
+              .queryParam("display", DISPLAY_COUNT)
+              .queryParam("sort", "date")
+              .build()
+              .toUri();
 
-      if (response == null || response.getItems() == null) {
+      HttpHeaders headers = new HttpHeaders();
+      headers.set("X-Naver-Client-Id", naverApiProperties.getClientId());
+      headers.set("X-Naver-Client-Secret", naverApiProperties.getClientSecret());
+
+      ResponseEntity<NaverNewsResponse> response =
+          restTemplate.exchange(
+              uri, HttpMethod.GET, new HttpEntity<>(headers), NaverNewsResponse.class);
+
+      NaverNewsResponse body = response.getBody();
+      if (body == null || body.getItems() == null) {
         return Collections.emptyList();
       }
 
-      return response.getItems().stream().map(this::toDto).toList();
+      return body.getItems().stream().map(this::toDto).toList();
 
     } catch (Exception e) {
       log.info("네이버 뉴스 수집 실패 - keyword: {}, error: {}", keyword, e.getMessage());

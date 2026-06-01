@@ -27,4 +27,7 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, Long
   @Query(
       "SELECT s.keyword, COUNT(s.userId) FROM Subscription s GROUP BY s.keyword ORDER BY COUNT(s.userId) DESC")
   List<Object[]> findTopKeywordsBySubscriberCount(Pageable pageable);
+
+  @Query("SELECT DISTINCT s.userId FROM Subscription s")
+  List<String> findAllDistinctUserIds();
 }

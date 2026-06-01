@@ -74,7 +74,6 @@ public class ArticleCritiqueService {
   private final ObjectMapper objectMapper;
   private final ArticleCritiqueRepository articleCritiqueRepository;
 
-  /** 스케줄러에서 호출: 아직 분석 안 된 URL이면 GPT 호출 후 저장 */
   @Transactional
   public void preComputeAndSave(String title, String body, String url, Long contentId) {
     if (url != null && articleCritiqueRepository.existsByUrl(url)) {
@@ -90,7 +89,6 @@ public class ArticleCritiqueService {
     }
   }
 
-  /** URL 타입 API 호출: 캐시 있으면 DB에서 반환, 없으면 GPT 호출 후 저장 */
   @Transactional
   public ArticleCritiqueResponse analyzeWithCache(String title, String body, String url) {
     if (url != null) {
@@ -111,7 +109,6 @@ public class ArticleCritiqueService {
     return analyze(title, body);
   }
 
-  /** 이슈 카드 상세 페이지 (2페이지): contentId로 사전 계산된 비평 결과 반환 */
   public ArticleCritiqueResponse getByContentId(Long contentId) {
     return articleCritiqueRepository
         .findTopByContentIdOrderByAnalyzedAtDesc(contentId)
@@ -119,7 +116,6 @@ public class ArticleCritiqueService {
         .orElseThrow(() -> new CustomException(AnalysisErrorCode.ANALYSIS_NOT_FOUND));
   }
 
-  /** TEXT 타입 API 호출: 캐시 없이 GPT 직접 호출 */
   public ArticleCritiqueResponse analyze(String title, String body) {
     log.info("비평 분석 시작 - title: {}", title);
     String rawResponse = callGpt(title, body);
@@ -179,7 +175,6 @@ public class ArticleCritiqueService {
         }
       }
 
-      // GPT가 패턴을 하나도 반환하지 않은 경우 기본 항목 추가
       if (critiques.isEmpty()) {
         critiques.add(
             CritiqueItem.builder()

@@ -188,6 +188,11 @@ public class NotificationServiceImpl implements NotificationService {
         .toList();
   }
 
+  @Override
+  public List<String> getAllSubscribedUserIds() {
+    return subscriptionRepository.findAllDistinctUserIds();
+  }
+
   private NotificationResponse toResponse(Notification n) {
     return NotificationResponse.builder()
         .id(n.getId())

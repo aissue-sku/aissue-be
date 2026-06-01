@@ -4,6 +4,7 @@
 package com.sku.aissue.domain.repository;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 
@@ -13,7 +14,7 @@ public interface ContentAnalysisRepository extends JpaRepository<ContentAnalysis
 
   List<ContentAnalysis> findByUserIdOrderByAnalyzedAtDesc(String userId);
 
-  java.util.Optional<ContentAnalysis> findTopByUrlOrderByAnalyzedAtDesc(String url);
+  Optional<ContentAnalysis> findTopByUrlOrderByAnalyzedAtDesc(String url);
 
   boolean existsByUserIdAndUrl(String userId, String url);
 }

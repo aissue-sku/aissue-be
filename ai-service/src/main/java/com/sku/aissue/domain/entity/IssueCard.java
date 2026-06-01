@@ -63,4 +63,8 @@ public class IssueCard {
   // 이 카드를 생성한 기준 키워드
   @Column(length = 100)
   private String keyword;
+
+  // null이면 공통 카드, 값이 있으면 해당 사용자 전용 개인화 카드
+  @Column(name = "user_id", length = 50)
+  private String userId;
 }

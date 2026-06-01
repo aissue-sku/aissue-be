@@ -44,4 +44,9 @@ public class InternalNotificationControllerImpl implements InternalNotificationC
         notificationService.getSubscriptions(userId).stream().map(sub -> sub.getKeyword()).toList();
     return ResponseEntity.ok(keywords);
   }
+
+  @Override
+  public ResponseEntity<List<String>> getAllSubscribedUserIds() {
+    return ResponseEntity.ok(notificationService.getAllSubscribedUserIds());
+  }
 }

@@ -37,4 +37,6 @@ public interface NotificationService {
   void sendDirect(DirectNotificationRequest request);
 
   List<PopularKeywordResponse> getPopularKeywords();
+
+  List<String> getAllSubscribedUserIds();
 }

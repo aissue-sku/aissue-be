@@ -11,11 +11,10 @@ import org.springframework.stereotype.Component;
 import com.sku.aissue.domain.collector.ContentCollector;
 import com.sku.aissue.domain.dto.CollectedContentDto;
 import com.sku.aissue.domain.entity.Content;
-import com.sku.aissue.domain.service.ArticleEmbeddingService;
 import com.sku.aissue.domain.service.ContentSaveService;
 import com.sku.aissue.domain.service.HotTopicService;
-import com.sku.aissue.domain.service.IssueCardService;
 import com.sku.aissue.domain.service.TrendingService;
+import com.sku.aissue.global.messaging.ContentEventPublisher;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,9 +27,8 @@ public class CollectionScheduler {
   private final List<ContentCollector> collectors;
   private final ContentSaveService contentSaveService;
   private final TrendingService trendingService;
-  private final IssueCardService issueCardService;
   private final HotTopicService hotTopicService;
-  private final ArticleEmbeddingService articleEmbeddingService;
+  private final ContentEventPublisher contentEventPublisher;
 
   // 30분마다 뉴스 수집
   @Scheduled(cron = "${scheduler.news.cron}")
@@ -48,7 +46,8 @@ public class CollectionScheduler {
               collected.size(),
               saved.size());
           if (!saved.isEmpty()) {
-            articleEmbeddingService.embedBatch(saved);
+            List<Long> ids = saved.stream().map(Content::getId).toList();
+            contentEventPublisher.publishContentCollected(ids);
           }
         });
   }
@@ -74,6 +73,6 @@ public class CollectionScheduler {
   public void refreshHotTopics() {
     log.info("급상승 키워드 및 이슈 카드 스케줄러 시작");
     hotTopicService.saveSnapshot();
-    issueCardService.generateAndSaveByHotTopics();
+    contentEventPublisher.publishTopicsRefreshed();
   }
 }

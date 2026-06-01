@@ -30,4 +30,10 @@ public class IssueCardControllerImpl implements IssueCardController {
             : issueCardService.getIssueCards();
     return ResponseEntity.ok(BaseResponse.success(cards));
   }
+
+  @Override
+  public ResponseEntity<BaseResponse<Void>> refreshIssueCards() {
+    issueCardService.generateAndSaveByHotTopics();
+    return ResponseEntity.ok(BaseResponse.success(null));
+  }
 }

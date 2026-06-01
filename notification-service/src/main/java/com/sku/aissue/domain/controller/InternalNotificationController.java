@@ -33,4 +33,7 @@ public interface InternalNotificationController {
   @GetMapping("/subscriptions/{userId}")
   ResponseEntity<List<String>> getUserSubscribedKeywords(
       @org.springframework.web.bind.annotation.PathVariable String userId);
+
+  @GetMapping("/subscribed-user-ids")
+  ResponseEntity<List<String>> getAllSubscribedUserIds();
 }

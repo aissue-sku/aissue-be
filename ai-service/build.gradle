@@ -1,0 +1,37 @@
+// AI Service - AI 분석 서비스
+dependencies {
+  // 공통 라이브러리
+  implementation project(':common')
+
+  // Web + Security
+  implementation 'org.springframework.boot:spring-boot-starter-web'
+  implementation 'org.springframework.boot:spring-boot-starter-security'
+  implementation 'org.springframework.boot:spring-boot-starter-validation'
+
+  // DB
+  implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+  runtimeOnly 'com.mysql:mysql-connector-j'
+
+  // HTTP 클라이언트 (OpenAI WebClient용)
+  implementation 'org.springframework.boot:spring-boot-starter-webflux'
+
+  // 캐시
+  implementation 'org.springframework.boot:spring-boot-starter-cache'
+  implementation 'com.github.ben-manes.caffeine:caffeine'
+
+  // HTML 파싱
+  implementation 'org.jsoup:jsoup:1.17.2'
+
+  // AWS S3 (이미지 업로드용)
+  implementation "io.awspring.cloud:spring-cloud-aws-starter-s3:${springCloudAwsVersion}"
+
+  // 서비스 디스커버리 + 중앙 설정
+  implementation 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client'
+  implementation 'org.springframework.cloud:spring-cloud-starter-config'
+
+  // 서킷 브레이커
+  implementation 'org.springframework.cloud:spring-cloud-starter-circuitbreaker-resilience4j'
+
+  // 메시지 큐
+  implementation 'org.springframework.boot:spring-boot-starter-amqp'
+}

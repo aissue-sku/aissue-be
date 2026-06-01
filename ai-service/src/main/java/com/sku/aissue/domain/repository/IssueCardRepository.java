@@ -14,18 +14,22 @@ import com.sku.aissue.domain.entity.IssueCard;
 
 public interface IssueCardRepository extends JpaRepository<IssueCard, Long> {
 
+  // 공통 카드 (userId IS NULL)
   @Query(
       """
       SELECT i FROM IssueCard i
-      WHERE i.snapshotAt = (SELECT MAX(i2.snapshotAt) FROM IssueCard i2)
+      WHERE i.userId IS NULL
+        AND i.snapshotAt = (SELECT MAX(i2.snapshotAt) FROM IssueCard i2 WHERE i2.userId IS NULL)
       ORDER BY i.rankOrder ASC
       """)
   List<IssueCard> findLatest();
 
+  // 구독 키워드에 해당하는 공통 카드 (read-time 개인화용)
   @Query(
       """
       SELECT i FROM IssueCard i
-      WHERE i.snapshotAt = (SELECT MAX(i2.snapshotAt) FROM IssueCard i2)
+      WHERE i.userId IS NULL
+        AND i.snapshotAt = (SELECT MAX(i2.snapshotAt) FROM IssueCard i2 WHERE i2.userId IS NULL)
         AND i.keyword IN :keywords
       ORDER BY i.rankOrder ASC
       """)

@@ -81,6 +81,28 @@ services:
       - aissue-network
     restart: unless-stopped
 
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: rabbitmq
+    expose:
+      - "5672"
+    ports:
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - aissue-network
+    restart: unless-stopped
+
   grafana:
     image: grafana/grafana:11.1.0
     container_name: grafana
@@ -110,3 +132,4 @@ volumes:
   prometheus-data:
   grafana-data:
   qdrant-data:
+  rabbitmq-data:

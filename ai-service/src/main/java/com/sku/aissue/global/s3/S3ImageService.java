@@ -26,11 +26,6 @@ public class S3ImageService {
   private final S3Client s3Client;
   private final S3Properties s3Properties;
 
-  /**
-   * 이미지 바이트 배열을 S3에 업로드하고 S3 URL을 반환합니다.
-   *
-   * @return S3 이미지 URL
-   */
   public String upload(byte[] imageBytes) {
     String key = KEY_PREFIX + UUID.randomUUID() + ".png";
 
