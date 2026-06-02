@@ -34,4 +34,7 @@ dependencies {
 
   // 메시지 큐
   implementation 'org.springframework.boot:spring-boot-starter-amqp'
+
+  // 기술적 분석
+  implementation 'org.ta4j:ta4j-core:0.16'
 }

@@ -13,12 +13,14 @@ import com.sku.aissue.domain.dto.request.ContentSubmitRequest;
 import com.sku.aissue.domain.dto.response.AnalysisHistoryResponse;
 import com.sku.aissue.domain.dto.response.AnalysisScoreResponse;
 import com.sku.aissue.domain.dto.response.ArticleCritiqueResponse;
+import com.sku.aissue.domain.dto.response.StockAnalysisResponse;
 import com.sku.aissue.domain.entity.ContentAnalysis;
 import com.sku.aissue.domain.repository.ContentAnalysisRepository;
 import com.sku.aissue.domain.service.ArticleCritiqueService;
 import com.sku.aissue.domain.service.ArticleEmbeddingService;
 import com.sku.aissue.domain.service.ArticleExtractor;
 import com.sku.aissue.domain.service.ContentAnalysisService;
+import com.sku.aissue.domain.service.StockAnalysisService;
 import com.sku.aissue.global.client.ContentServiceClient;
 import com.sku.aissue.global.client.ContentServiceClient.SaveContentRequest;
 import com.sku.aissue.global.client.NotificationServiceClient;
@@ -37,6 +39,7 @@ public class AnalysisControllerImpl implements AnalysisController {
   private final ContentAnalysisRepository contentAnalysisRepository;
   private final ContentServiceClient contentServiceClient;
   private final NotificationServiceClient notificationServiceClient;
+  private final StockAnalysisService stockAnalysisService;
 
   @Override
   public ResponseEntity<BaseResponse<AnalysisScoreResponse>> submit(
@@ -71,7 +74,9 @@ public class AnalysisControllerImpl implements AnalysisController {
     notificationServiceClient.sendDirect(username, title, url, saved != null ? saved.id() : null);
 
     Long contentId = saved != null ? saved.id() : null;
-    return ResponseEntity.ok(BaseResponse.success(result.toBuilder().contentId(contentId).build()));
+    List<StockAnalysisResponse> stocks = stockAnalysisService.analyzeByText(title, body);
+    return ResponseEntity.ok(
+        BaseResponse.success(result.toBuilder().contentId(contentId).stocks(stocks).build()));
   }
 
   @Override
@@ -130,6 +135,7 @@ public class AnalysisControllerImpl implements AnalysisController {
 
   @Override
   public ResponseEntity<BaseResponse<AnalysisScoreResponse>> getAnalysisByContentId(Long id) {
-    return ResponseEntity.ok(BaseResponse.success(contentAnalysisService.getByContentId(id)));
+    AnalysisScoreResponse result = contentAnalysisService.getByContentId(id);
+    return ResponseEntity.ok(BaseResponse.success(result.toBuilder().contentId(id).build()));
   }
 }

@@ -7,6 +7,7 @@ import java.util.List;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -68,7 +69,9 @@ public class InternalContentControllerImpl implements InternalContentController 
 
   @Override
   public ResponseEntity<PagedContentInfo> getPaged(int page, int size) {
-    Page<Content> fetched = contentRepository.findAll(PageRequest.of(page, size));
+    Page<Content> fetched =
+        contentRepository.findAll(
+            PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "publishedAt")));
     List<ContentInfo> contents = fetched.getContent().stream().map(this::toInfo).toList();
     return ResponseEntity.ok(
         new PagedContentInfo(contents, fetched.hasNext(), fetched.getTotalPages()));

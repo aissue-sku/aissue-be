@@ -33,7 +33,9 @@ public class RabbitMQConfig {
 
   @Bean
   public Binding bindingCardsGenerated(Queue queueCardsGenerated, TopicExchange aissueExchange) {
-    return BindingBuilder.bind(queueCardsGenerated).to(aissueExchange).with(ROUTING_KEY_CARDS_GENERATED);
+    return BindingBuilder.bind(queueCardsGenerated)
+        .to(aissueExchange)
+        .with(ROUTING_KEY_CARDS_GENERATED);
   }
 
   @Bean
@@ -44,7 +46,8 @@ public class RabbitMQConfig {
   }
 
   @Bean
-  public RabbitTemplate rabbitTemplate(ConnectionFactory cf, Jackson2JsonMessageConverter converter) {
+  public RabbitTemplate rabbitTemplate(
+      ConnectionFactory cf, Jackson2JsonMessageConverter converter) {
     RabbitTemplate template = new RabbitTemplate(cf);
     template.setMessageConverter(converter);
     return template;

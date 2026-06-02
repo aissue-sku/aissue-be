@@ -69,4 +69,10 @@ public class ContentAnalysis {
 
   @Column(name = "analyzed_at", nullable = false)
   private LocalDateTime analyzedAt;
+
+  @Column(name = "related_articles_json", columnDefinition = "TEXT")
+  private String relatedArticlesJson;
+
+  @Column(name = "stocks_json", columnDefinition = "TEXT")
+  private String stocksJson;
 }

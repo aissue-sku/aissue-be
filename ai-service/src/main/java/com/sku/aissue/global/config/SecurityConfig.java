@@ -45,8 +45,9 @@ public class SecurityConfig {
                         "/internal/**",
                         "/api/issues",
                         "/api/issues/**",
-                        "/api/analysis/*/score",
-                        "/api/analysis/*/critique")
+                        "/api/analysis/content/*/score",
+                        "/api/analysis/content/*/critique",
+                        "/api/analysis/embed/**")
                     .permitAll()
                     .anyRequest()
                     .authenticated());

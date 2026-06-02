@@ -7,6 +7,7 @@ import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -86,14 +87,26 @@ public class ContentQueryService {
           contentRepository.findByKeywordBeforeCursor(
               keyword, effectiveCursor, PageRequest.of(0, size + 1));
     } else {
-      Map<Long, Content> seen = new LinkedHashMap<>();
+      int fetchSize = Math.max(size * 10, 100);
+      Map<Long, Content> candidateMap = new LinkedHashMap<>();
+      Map<Long, Integer> matchCount = new HashMap<>();
+
       for (String word : words) {
         contentRepository
-            .findByKeywordBeforeCursor(word, effectiveCursor, PageRequest.of(0, size + 1))
-            .forEach(c -> seen.putIfAbsent(c.getId(), c));
+            .findByKeywordBeforeCursor(word, effectiveCursor, PageRequest.of(0, fetchSize))
+            .forEach(
+                c -> {
+                  candidateMap.putIfAbsent(c.getId(), c);
+                  matchCount.merge(c.getId(), 1, Integer::sum);
+                });
       }
-      fetched = new ArrayList<>(seen.values());
-      fetched.sort(Comparator.comparingLong(Content::getId).reversed());
+
+      fetched = new ArrayList<>(candidateMap.values());
+      fetched.sort(
+          Comparator.comparingInt((Content c) -> matchCount.getOrDefault(c.getId(), 0))
+              .reversed()
+              .thenComparingLong(Content::getId)
+              .reversed());
       if (fetched.size() > size + 1) fetched = fetched.subList(0, size + 1);
     }
 

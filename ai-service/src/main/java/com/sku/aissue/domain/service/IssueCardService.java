@@ -107,6 +107,7 @@ public class IssueCardService {
   private final S3ImageService s3ImageService;
   private final ArticleCritiqueService articleCritiqueService;
   private final ContentAnalysisService contentAnalysisService;
+  private final StockAnalysisService stockAnalysisService;
   private final CardEventPublisher cardEventPublisher;
 
   @Cacheable(value = "issueCards", key = "'latest'")
@@ -243,6 +244,12 @@ public class IssueCardService {
       } catch (Exception e) {
         log.error("신뢰도 분석 사전 계산 오류 - url: {}, error: {}", content.url(), e.getMessage());
       }
+      try {
+        var stocks = stockAnalysisService.analyzeByText(content.title(), content.body());
+        contentAnalysisService.saveStocks(content.url(), stocks);
+      } catch (Exception e) {
+        log.warn("종목 분석 사전 계산 오류 - url: {}, error: {}", content.url(), e.getMessage());
+      }
     }
     log.info("기사 분석 사전 계산 완료");
   }
@@ -306,6 +313,8 @@ public class IssueCardService {
   }
 
   private ContentInfo findArticleForKeyword(String keyword) {
+    LocalDateTime threshold = LocalDateTime.now().minusDays(3);
+
     try {
       List<Float> vector = openAiClient.embed(keyword);
       List<Long> ids = qdrantClient.search(vector, 3);
@@ -314,7 +323,12 @@ public class IssueCardService {
         Map<Long, ContentInfo> contentMap =
             contents.stream().collect(Collectors.toMap(ContentInfo::id, c -> c));
         ContentInfo ranked =
-            ids.stream().map(contentMap::get).filter(c -> c != null).findFirst().orElse(null);
+            ids.stream()
+                .map(contentMap::get)
+                .filter(c -> c != null)
+                .filter(c -> c.publishedAt() == null || c.publishedAt().isAfter(threshold))
+                .findFirst()
+                .orElse(null);
         if (ranked != null) {
           log.debug("Qdrant 검색 성공 - keyword: {}", keyword);
           return ranked;
@@ -324,7 +338,18 @@ public class IssueCardService {
       log.warn("Qdrant 검색 실패, 텍스트 검색으로 폴백 - keyword: {}, error: {}", keyword, e.getMessage());
     }
 
-    return findArticleByTextMatch(keyword);
+    ContentInfo article = findArticleByTextMatch(keyword);
+    if (article != null
+        && article.publishedAt() != null
+        && article.publishedAt().isBefore(threshold)) {
+      log.info(
+          "키워드 매칭 기사가 너무 오래됨 ({}일 이상) - keyword: {}, publishedAt: {}",
+          3,
+          keyword,
+          article.publishedAt());
+      return null;
+    }
+    return article;
   }
 
   private ContentInfo findArticleByTextMatch(String keyword) {

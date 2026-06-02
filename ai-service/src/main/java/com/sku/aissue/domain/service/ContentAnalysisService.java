@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sku.aissue.domain.dto.response.AnalysisScoreResponse;
@@ -22,6 +23,7 @@ import com.sku.aissue.domain.dto.response.AnalysisScoreResponse.FactCheckItem;
 import com.sku.aissue.domain.dto.response.AnalysisScoreResponse.RelatedArticle;
 import com.sku.aissue.domain.dto.response.AnalysisScoreResponse.ScoreDetail;
 import com.sku.aissue.domain.dto.response.AnalysisScoreResponse.SubItem;
+import com.sku.aissue.domain.dto.response.StockAnalysisResponse;
 import com.sku.aissue.domain.entity.ContentAnalysis;
 import com.sku.aissue.domain.exception.AnalysisErrorCode;
 import com.sku.aissue.domain.repository.ContentAnalysisRepository;
@@ -144,8 +146,12 @@ public class ContentAnalysisService {
             cached -> {
               try {
                 AnalysisScoreResponse result = parseResponse(cached.getDetailsJson());
-                List<RelatedArticle> related = findRelatedArticles(cached.getTitle(), url);
-                return result.toBuilder().url(url).relatedArticles(related).build();
+                List<RelatedArticle> related =
+                    cached.getRelatedArticlesJson() != null
+                        ? deserializeRelatedArticles(cached.getRelatedArticlesJson())
+                        : findRelatedArticles(cached.getTitle(), url);
+                List<StockAnalysisResponse> stocks = deserializeStocks(cached.getStocksJson());
+                return result.toBuilder().url(url).relatedArticles(related).stocks(stocks).build();
               } catch (Exception e) {
                 log.warn("신뢰도 분석 캐시 파싱 실패 - contentId: {}", contentId);
                 throw new CustomException(AnalysisErrorCode.ANALYSIS_NOT_FOUND);
@@ -165,10 +171,18 @@ public class ContentAnalysisService {
           log.info("신뢰도 분석 캐시 반환 - url: {}", url);
           AnalysisScoreResponse cachedResult = parseResponse(cached.get().getDetailsJson());
           if (userId != null) {
-            saveHistory(title, url, userId, cachedResult, cached.get().getDetailsJson());
+            saveHistory(title, url, userId, cachedResult, cached.get().getDetailsJson(), null);
           }
-          List<RelatedArticle> relatedArticles = findRelatedArticles(title, url);
-          return cachedResult.toBuilder().url(url).relatedArticles(relatedArticles).build();
+          List<RelatedArticle> relatedArticles =
+              cached.get().getRelatedArticlesJson() != null
+                  ? deserializeRelatedArticles(cached.get().getRelatedArticlesJson())
+                  : findRelatedArticles(title, url);
+          List<StockAnalysisResponse> stocks = deserializeStocks(cached.get().getStocksJson());
+          return cachedResult.toBuilder()
+              .url(url)
+              .relatedArticles(relatedArticles)
+              .stocks(stocks)
+              .build();
         } catch (Exception e) {
           log.warn("신뢰도 분석 캐시 파싱 실패, GPT 재분석 - url: {}", url);
         }
@@ -179,9 +193,9 @@ public class ContentAnalysisService {
     String rawResponse = openAiClient.chat(SYSTEM_PROMPT, userPrompt);
     AnalysisScoreResponse result = parseResponse(rawResponse);
 
-    saveHistory(title, url, userId, result, rawResponse);
-
     List<RelatedArticle> relatedArticles = findRelatedArticles(title, url);
+    saveHistory(title, url, userId, result, rawResponse, relatedArticles);
+
     result = result.toBuilder().url(url).relatedArticles(relatedArticles).build();
 
     log.info("콘텐츠 신뢰도 분석 성공 - totalScore: {}", result.getTotalScore());
@@ -189,15 +203,27 @@ public class ContentAnalysisService {
   }
 
   private List<RelatedArticle> findRelatedArticles(String title, String currentUrl) {
-    if (title == null || title.isBlank()) return List.of();
+    List<ContentInfo> candidates = new ArrayList<>();
 
-    List<String> keywords = extractKeywords(title);
-    if (keywords.isEmpty()) return List.of();
+    if (title != null && !title.isBlank()) {
+      List<String> keywords = extractKeywords(title);
+      for (String keyword : keywords) {
+        List<ContentInfo> found = contentServiceClient.findByTitle(keyword, 0, 10);
+        if (!found.isEmpty()) {
+          candidates = found;
+          break;
+        }
+      }
+    }
 
-    List<ContentInfo> candidates = List.of();
-    for (String keyword : keywords) {
-      candidates = contentServiceClient.findByTitle(keyword, 0, 10);
-      if (!candidates.isEmpty()) break;
+    // 키워드 검색 실패 시 최신 기사로 폴백
+    if (candidates.isEmpty()) {
+      try {
+        candidates = new ArrayList<>(contentServiceClient.findPaged(0, 10).contents());
+      } catch (Exception e) {
+        log.warn("관련 기사 폴백 조회 실패: {}", e.getMessage());
+        return List.of();
+      }
     }
 
     return candidates.stream()
@@ -251,13 +277,37 @@ public class ContentAnalysisService {
     return days + "일 전";
   }
 
+  @Transactional
+  public void saveStocks(String url, List<StockAnalysisResponse> stocks) {
+    if (url == null || stocks == null) return;
+    try {
+      String stocksJson = objectMapper.writeValueAsString(stocks);
+      contentAnalysisRepository.updateStocks(url, stocksJson);
+    } catch (Exception e) {
+      log.warn("종목 분석 저장 실패 - url: {}, error: {}", url, e.getMessage());
+    }
+  }
+
   private void saveHistory(
-      String title, String url, String userId, AnalysisScoreResponse result, String detailsJson) {
+      String title,
+      String url,
+      String userId,
+      AnalysisScoreResponse result,
+      String detailsJson,
+      List<RelatedArticle> relatedArticles) {
     if (userId != null
         && url != null
         && contentAnalysisRepository.existsByUserIdAndUrl(userId, url)) {
       log.info("분석 이력 중복 스킵 - userId: {}, url: {}", userId, url);
       return;
+    }
+    String relatedJson = null;
+    if (relatedArticles != null && !relatedArticles.isEmpty()) {
+      try {
+        relatedJson = objectMapper.writeValueAsString(relatedArticles);
+      } catch (Exception e) {
+        log.warn("관련 기사 직렬화 실패: {}", e.getMessage());
+      }
     }
     ContentAnalysis analysis =
         ContentAnalysis.builder()
@@ -273,9 +323,28 @@ public class ContentAnalysisService {
             .verdict(result.getVerdict())
             .summary(result.getSummary())
             .detailsJson(detailsJson)
+            .relatedArticlesJson(relatedJson)
             .analyzedAt(LocalDateTime.now())
             .build();
     contentAnalysisRepository.save(analysis);
+  }
+
+  private List<RelatedArticle> deserializeRelatedArticles(String json) {
+    if (json == null || json.isBlank()) return List.of();
+    try {
+      return objectMapper.readValue(json, new TypeReference<>() {});
+    } catch (Exception e) {
+      return List.of();
+    }
+  }
+
+  private List<StockAnalysisResponse> deserializeStocks(String json) {
+    if (json == null || json.isBlank()) return List.of();
+    try {
+      return objectMapper.readValue(json, new TypeReference<>() {});
+    } catch (Exception e) {
+      return List.of();
+    }
   }
 
   private String buildUserPrompt(String title, String body) {

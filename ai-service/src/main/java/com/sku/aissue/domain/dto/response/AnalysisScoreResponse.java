@@ -50,6 +50,9 @@ public class AnalysisScoreResponse {
   @Schema(description = "관련 기사 목록 (최대 3개)")
   private final List<RelatedArticle> relatedArticles;
 
+  @Schema(description = "관련 종목 기술적 분석 결과 (최대 3개)")
+  private final List<StockAnalysisResponse> stocks;
+
   @Getter
   @Builder
   @Schema(description = "항목별 점수와 근거")

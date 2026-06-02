@@ -41,13 +41,18 @@ public class RabbitMQConfig {
   }
 
   @Bean
-  public Binding bindingContentCollected(Queue queueContentCollected, TopicExchange aissueExchange) {
-    return BindingBuilder.bind(queueContentCollected).to(aissueExchange).with(ROUTING_KEY_CONTENT_COLLECTED);
+  public Binding bindingContentCollected(
+      Queue queueContentCollected, TopicExchange aissueExchange) {
+    return BindingBuilder.bind(queueContentCollected)
+        .to(aissueExchange)
+        .with(ROUTING_KEY_CONTENT_COLLECTED);
   }
 
   @Bean
   public Binding bindingTopicsRefreshed(Queue queueTopicsRefreshed, TopicExchange aissueExchange) {
-    return BindingBuilder.bind(queueTopicsRefreshed).to(aissueExchange).with(ROUTING_KEY_TOPICS_REFRESHED);
+    return BindingBuilder.bind(queueTopicsRefreshed)
+        .to(aissueExchange)
+        .with(ROUTING_KEY_TOPICS_REFRESHED);
   }
 
   @Bean
@@ -58,7 +63,8 @@ public class RabbitMQConfig {
   }
 
   @Bean
-  public RabbitTemplate rabbitTemplate(ConnectionFactory cf, Jackson2JsonMessageConverter converter) {
+  public RabbitTemplate rabbitTemplate(
+      ConnectionFactory cf, Jackson2JsonMessageConverter converter) {
     RabbitTemplate template = new RabbitTemplate(cf);
     template.setMessageConverter(converter);
     return template;
