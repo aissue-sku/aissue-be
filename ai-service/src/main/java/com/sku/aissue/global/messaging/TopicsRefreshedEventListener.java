@@ -20,9 +20,9 @@ public class TopicsRefreshedEventListener {
 
   @RabbitListener(queues = RabbitMQConfig.QUEUE_TOPICS_REFRESHED)
   public void onTopicsRefreshed(Object ignored) {
-    log.info("topics.refreshed 이벤트 수신 - 이슈 카드 생성 시작");
+    log.info("topics.refreshed 이벤트 수신 - 이슈 카드 생성 시작 (이미지 생성 생략)");
     try {
-      issueCardService.generateAndSaveByHotTopics();
+      issueCardService.generateAndSaveByHotTopics(false);
     } catch (Exception e) {
       log.error("이슈 카드 생성 실패: {}", e.getMessage());
     }

@@ -37,8 +37,8 @@ public class InternalAiController {
 
   @PostMapping("/issue-cards")
   public ResponseEntity<BaseResponse<Void>> triggerIssueCards() {
-    log.info("이슈 카드 생성 트리거 수신");
-    issueCardService.generateAndSaveByHotTopics();
+    log.info("이슈 카드 생성 트리거 수신 (스케줄러 경유 — 이미지 생성 생략)");
+    issueCardService.generateAndSaveByHotTopics(false);
     return ResponseEntity.ok(BaseResponse.success(null));
   }
 

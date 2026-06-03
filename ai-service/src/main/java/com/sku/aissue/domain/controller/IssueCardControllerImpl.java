@@ -33,7 +33,13 @@ public class IssueCardControllerImpl implements IssueCardController {
 
   @Override
   public ResponseEntity<BaseResponse<Void>> refreshIssueCards() {
-    issueCardService.generateAndSaveByHotTopics();
+    issueCardService.generateAndSaveByHotTopics(true);
+    return ResponseEntity.ok(BaseResponse.success(null));
+  }
+
+  @Override
+  public ResponseEntity<BaseResponse<Void>> refreshIssueCardsWithoutImage() {
+    issueCardService.generateAndSaveByHotTopics(false);
     return ResponseEntity.ok(BaseResponse.success(null));
   }
 }

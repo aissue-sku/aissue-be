@@ -73,7 +73,18 @@ public interface IssueCardController {
 
   @PostMapping("/cards/refresh")
   @SecurityRequirements
-  @Operation(summary = "이슈 카드 수동 생성", description = "스케줄러를 기다리지 않고 AI 이슈 카드를 즉시 생성합니다.")
+  @Operation(
+      summary = "이슈 카드 수동 생성 (이미지 포함)",
+      description = "스케줄러를 기다리지 않고 AI 이슈 카드를 즉시 생성합니다. 각 카드의 이미지를 OpenAI로 생성하여 S3에 업로드합니다.")
   @ApiResponses({@ApiResponse(responseCode = "200", description = "생성 성공")})
   ResponseEntity<BaseResponse<Void>> refreshIssueCards();
+
+  @PostMapping("/cards/refresh/no-image")
+  @SecurityRequirements
+  @Operation(
+      summary = "이슈 카드 수동 생성 (이미지 제외)",
+      description =
+          "스케줄러를 기다리지 않고 AI 이슈 카드를 즉시 생성합니다. 이미지 생성을 건너뛰어 호출 비용과 시간을 줄입니다. imageUrl은 null로 저장됩니다.")
+  @ApiResponses({@ApiResponse(responseCode = "200", description = "생성 성공")})
+  ResponseEntity<BaseResponse<Void>> refreshIssueCardsWithoutImage();
 }

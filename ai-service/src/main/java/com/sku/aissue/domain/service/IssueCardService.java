@@ -88,8 +88,12 @@ public class IssueCardService {
 
       imagePrompt rules:
       - Describe a scene or concept that visually represents the topic
-      - Editorial/news illustration style
-      - No text, no watermarks, no specific real persons' faces
+      - Photorealistic documentary/photojournalism style — like a Reuters or AP news photograph, NOT digital illustration or AI art
+      - Natural lighting, realistic textures, candid composition, shallow depth of field
+      - Set in South Korea
+      - Any people depicted MUST be ethnically Korean (East Asian features, black hair) — unless the topic is explicitly about a foreign country or foreign people
+      - Use Korean settings where relevant: Korean cityscape, Korean architecture, Hangul signage in background, Korean street/office/home interiors
+      - No text overlays, no watermarks, no specific real persons' faces, no cartoon/illustration aesthetic, no oversaturated colors
       - In English
 
       Rules:
@@ -146,8 +150,8 @@ public class IssueCardService {
 
   @Transactional
   @CacheEvict(value = "issueCards", allEntries = true)
-  public void generateAndSaveByHotTopics() {
-    log.info("키워드 기반 이슈 카드 생성 시작");
+  public void generateAndSaveByHotTopics(boolean generateImages) {
+    log.info("키워드 기반 이슈 카드 생성 시작 - 이미지 생성: {}", generateImages);
 
     List<String> keywords = buildKeywordList();
     if (keywords.isEmpty()) {
@@ -188,7 +192,7 @@ public class IssueCardService {
                 card -> {
                   ContentInfo content = urlToContent.get(card.sourceUrl());
                   String cardKeyword = urlToKeyword.get(card.sourceUrl());
-                  String imageUrl = generateImageSafely(card.imagePrompt());
+                  String imageUrl = generateImages ? generateImageSafely(card.imagePrompt()) : null;
                   return IssueCard.builder()
                       .title(card.hook())
                       .teaser(card.teaser())
@@ -431,15 +435,26 @@ public class IssueCardService {
     }
   }
 
+  private static final String IMAGE_PROMPT_PREFIX =
+      "Photorealistic documentary news photograph, shot on a 35mm DSLR with natural lighting and shallow depth of field, "
+          + "in the style of Reuters or AP photojournalism. Candid composition, realistic skin texture, real-world imperfections. "
+          + "Set in South Korea. "
+          + "All people depicted are ethnically Korean with East Asian features and black hair "
+          + "(unless the subject is explicitly about a foreign country or foreign people). "
+          + "Korean cultural context: Korean cityscape, Korean architecture, Hangul signage in background where natural. "
+          + "Avoid: digital illustration, cartoon style, anime, 3D render, oversaturated colors, overly smooth skin, AI-art aesthetic, text overlays, watermarks, specific real persons' faces. "
+          + "Subject: ";
+
   private String generateImageSafely(String imagePrompt) {
     if (imagePrompt == null || imagePrompt.isBlank()) {
       return null;
     }
+    String wrappedPrompt = IMAGE_PROMPT_PREFIX + imagePrompt;
     try {
-      byte[] imageBytes = openAiClient.generateImage(imagePrompt);
+      byte[] imageBytes = openAiClient.generateImage(wrappedPrompt);
       return s3ImageService.upload(imageBytes);
     } catch (Exception e) {
-      log.error("이미지 생성/업로드 실패 - prompt: {}, error: {}", imagePrompt, e.getMessage(), e);
+      log.error("이미지 생성/업로드 실패 - prompt: {}, error: {}", wrappedPrompt, e.getMessage(), e);
       return null;
     }
   }
