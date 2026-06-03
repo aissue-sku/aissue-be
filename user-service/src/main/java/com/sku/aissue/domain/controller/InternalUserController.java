@@ -24,4 +24,8 @@ public interface InternalUserController {
 
   @PostMapping("/{userId}/points")
   ResponseEntity<Void> addPoints(@PathVariable Long userId, @RequestBody AddPointsRequest request);
+
+  @PostMapping("/by-username/{username}/points")
+  ResponseEntity<Void> addPointsByUsername(
+      @PathVariable String username, @RequestBody AddPointsRequest request);
 }

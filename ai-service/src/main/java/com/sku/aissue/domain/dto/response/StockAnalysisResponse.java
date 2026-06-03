@@ -3,6 +3,8 @@
  */
 package com.sku.aissue.domain.dto.response;
 
+import java.util.List;
+
 import lombok.Builder;
 import lombok.Getter;
 import lombok.extern.jackson.Jacksonized;
@@ -18,48 +20,36 @@ public class StockAnalysisResponse {
   private Long currentPrice;
   private Long priceChange;
   private Double priceChangeRate;
-  private Indicators indicators;
-  private Signals signals;
-  private FibonacciLevels fibonacci;
   private int overallScore;
   private String recommendation; // BUY / WATCH / SELL
   private String summary;
+  private List<KeyPoint> keyPoints;
 
   @Getter
   @Builder
   @Jacksonized
-  public static class Indicators {
-    private Long ma5;
-    private Long ma20;
-    private Long ma60;
-    private Long ma120;
-    private Double rsi;
-    private Double macd;
-    private Double macdSignal;
-    private Double macdHistogram;
-    private Long bollingerUpper;
-    private Long bollingerMiddle;
-    private Long bollingerLower;
-    private Double adx;
+  public static class KeyPoint {
+    private String type; // positive / warning / negative / neutral
+    private String text;
   }
 
+  // 내부 계산용 (직렬화 제외)
   @Getter
   @Builder
-  @Jacksonized
   public static class Signals {
-    private String trend; // BULLISH / BEARISH / NEUTRAL
+    private String trend;
     private boolean goldenCross;
     private boolean deadCross;
-    private String rsiSignal; // OVERBOUGHT / OVERSOLD / NEUTRAL
-    private String macdSignal; // BUY / SELL / NEUTRAL
-    private String bollingerSignal; // UPPER / MIDDLE / LOWER
+    private String rsiSignal;
+    private String macdSignal;
+    private String bollingerSignal;
     private boolean volumeSpike;
-    private String adxStrength; // VERY_STRONG / STRONG / MODERATE / WEAK
+    private String adxStrength;
   }
 
+  // 내부 계산용 (직렬화 제외)
   @Getter
   @Builder
-  @Jacksonized
   public static class FibonacciLevels {
     private Long support;
     private Long resistance;

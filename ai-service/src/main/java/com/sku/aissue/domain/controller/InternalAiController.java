@@ -20,12 +20,14 @@ import com.sku.aissue.domain.service.IssueCardService;
 import com.sku.aissue.domain.service.StockAnalysisService;
 import com.sku.aissue.response.BaseResponse;
 
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @RestController
 @RequestMapping("/internal/ai")
+@Tag(name = "AI", description = "AI 생성 API")
 @RequiredArgsConstructor
 public class InternalAiController {
 

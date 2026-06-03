@@ -5,6 +5,7 @@ package com.sku.aissue.domain.service;
 
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
@@ -24,7 +25,7 @@ import org.ta4j.core.indicators.statistics.StandardDeviationIndicator;
 
 import com.sku.aissue.domain.dto.response.StockAnalysisResponse;
 import com.sku.aissue.domain.dto.response.StockAnalysisResponse.FibonacciLevels;
-import com.sku.aissue.domain.dto.response.StockAnalysisResponse.Indicators;
+import com.sku.aissue.domain.dto.response.StockAnalysisResponse.KeyPoint;
 import com.sku.aissue.domain.dto.response.StockAnalysisResponse.Signals;
 import com.sku.aissue.domain.entity.Stock;
 import com.sku.aissue.domain.entity.StockPrice;
@@ -130,6 +131,8 @@ public class TechnicalAnalysisService {
     int score = calcScore(signals, rsiVal, adxVal);
     String recommendation = score >= 65 ? "BUY" : score >= 45 ? "WATCH" : "SELL";
     String summary = buildSummary(signals, rsiVal, adxVal, ma5Val, ma20Val, fibonacci);
+    List<KeyPoint> keyPoints =
+        buildKeyPoints(signals, rsiVal, adxVal, ma5Val, ma20Val, fibonacci, volumeSpike);
 
     return StockAnalysisResponse.builder()
         .code(stock.getCode())
@@ -138,26 +141,10 @@ public class TechnicalAnalysisService {
         .currentPrice((long) currentPrice)
         .priceChange((long) priceChange)
         .priceChangeRate(Math.round(priceChangeRate * 100.0) / 100.0)
-        .indicators(
-            Indicators.builder()
-                .ma5((long) ma5Val)
-                .ma20((long) ma20Val)
-                .ma60(ma60Val > 0 ? (long) ma60Val : null)
-                .ma120(ma120Val > 0 ? (long) ma120Val : null)
-                .rsi(Math.round(rsiVal * 10.0) / 10.0)
-                .macd(Math.round(macdVal * 10.0) / 10.0)
-                .macdSignal(Math.round(macdSignalVal * 10.0) / 10.0)
-                .macdHistogram(Math.round(macdHist * 10.0) / 10.0)
-                .bollingerUpper((long) bbUpperVal)
-                .bollingerMiddle((long) bbMiddleVal)
-                .bollingerLower((long) bbLowerVal)
-                .adx(Math.round(adxVal * 10.0) / 10.0)
-                .build())
-        .signals(signals)
-        .fibonacci(fibonacci)
         .overallScore(score)
         .recommendation(recommendation)
         .summary(summary)
+        .keyPoints(keyPoints)
         .build();
   }
 
@@ -300,6 +287,84 @@ public class TechnicalAnalysisService {
     if (s.isVolumeSpike()) sb.append("거래량 급등(5일 평균 2배 이상). ");
     sb.append(String.format("피보나치 지지 %,d원 / 저항 %,d원.", fib.getSupport(), fib.getResistance()));
     return sb.toString().trim();
+  }
+
+  private List<KeyPoint> buildKeyPoints(
+      Signals s,
+      double rsi,
+      double adx,
+      double ma5,
+      double ma20,
+      FibonacciLevels fib,
+      boolean volumeSpike) {
+    List<KeyPoint> points = new ArrayList<>();
+
+    // 추세
+    if (s.isGoldenCross()) {
+      points.add(kp("positive", "단기 이동평균이 중기를 상향 돌파(골든크로스) — 상승 전환 신호"));
+    } else if (s.isDeadCross()) {
+      points.add(kp("negative", "단기 이동평균이 중기를 하향 돌파(데드크로스) — 하락 전환 신호"));
+    } else if ("BULLISH".equals(s.getTrend())) {
+      points.add(
+          kp(
+              "positive",
+              String.format(
+                  "단기·중기 이동평균 정배열 (MA5 %,d > MA20 %,d) — 상승 흐름 유지 중", (long) ma5, (long) ma20)));
+    } else if ("BEARISH".equals(s.getTrend())) {
+      points.add(
+          kp(
+              "negative",
+              String.format(
+                  "단기·중기 이동평균 역배열 (MA5 %,d < MA20 %,d) — 하락 압력 존재", (long) ma5, (long) ma20)));
+    }
+
+    // MACD
+    if ("BUY".equals(s.getMacdSignal())) {
+      points.add(kp("positive", "MACD가 시그널선을 상향 돌파 — 단기 매수세 강화 중"));
+    } else if ("SELL".equals(s.getMacdSignal())) {
+      points.add(kp("negative", "MACD가 시그널선을 하향 돌파 — 단기 매도 압력 증가"));
+    }
+
+    // RSI
+    if ("OVERBOUGHT".equals(s.getRsiSignal())) {
+      points.add(kp("warning", String.format("RSI %.1f — 과매수 구간(70 이상), 단기 조정 가능성 있음", rsi)));
+    } else if ("OVERSOLD".equals(s.getRsiSignal())) {
+      points.add(kp("positive", String.format("RSI %.1f — 과매도 구간(30 이하), 반등 기회 가능성", rsi)));
+    }
+
+    // 볼린저밴드
+    if ("UPPER".equals(s.getBollingerSignal())) {
+      points.add(kp("warning", "볼린저밴드 상단 돌파 — 강한 상승이나 단기 과열 주의"));
+    } else if ("LOWER".equals(s.getBollingerSignal())) {
+      points.add(kp("positive", "볼린저밴드 하단 접근 — 반등 가능성, 저점 매수 고려 구간"));
+    }
+
+    // 거래량
+    if (volumeSpike && "BULLISH".equals(s.getTrend())) {
+      points.add(kp("positive", "거래량 급증(5일 평균 2배 이상) + 상승 추세 — 강한 매수 신호"));
+    } else if (volumeSpike) {
+      points.add(kp("warning", "거래량 급증 — 방향 확인 필요"));
+    }
+
+    // ADX (추세 강도)
+    if ("VERY_STRONG".equals(s.getAdxStrength()) || "STRONG".equals(s.getAdxStrength())) {
+      points.add(kp("neutral", String.format("ADX %.1f — 추세 강도 강함, 현재 방향성이 뚜렷한 구간", adx)));
+    } else if ("WEAK".equals(s.getAdxStrength())) {
+      points.add(kp("neutral", String.format("ADX %.1f — 추세 약함, 횡보 가능성 높음", adx)));
+    }
+
+    // 피보나치 지지/저항
+    points.add(
+        kp(
+            "neutral",
+            String.format(
+                "주요 지지선 %,d원 / 저항선 %,d원 (피보나치 기준)", fib.getSupport(), fib.getResistance())));
+
+    return points;
+  }
+
+  private KeyPoint kp(String type, String text) {
+    return KeyPoint.builder().type(type).text(text).build();
   }
 
   private StockAnalysisResponse buildInsufficientDataResponse(

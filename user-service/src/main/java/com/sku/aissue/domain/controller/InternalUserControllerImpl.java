@@ -28,4 +28,10 @@ public class InternalUserControllerImpl implements InternalUserController {
     userService.addPoints(userId, request);
     return ResponseEntity.ok().build();
   }
+
+  @Override
+  public ResponseEntity<Void> addPointsByUsername(String username, AddPointsRequest request) {
+    userService.addPointsByUsername(username, request);
+    return ResponseEntity.ok().build();
+  }
 }

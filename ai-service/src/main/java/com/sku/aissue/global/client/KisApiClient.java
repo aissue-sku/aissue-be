@@ -3,6 +3,7 @@
  */
 package com.sku.aissue.global.client;
 
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -59,6 +60,7 @@ public class KisApiClient {
                       "appsecret", appSecret))
               .retrieve()
               .bodyToMono(Map.class)
+              .timeout(Duration.ofSeconds(5))
               .block();
 
       String token = (String) response.get("access_token");
@@ -100,6 +102,7 @@ public class KisApiClient {
               .header("tr_id", "FHKST03010100")
               .retrieve()
               .bodyToMono(Map.class)
+              .timeout(Duration.ofSeconds(5))
               .block();
 
       if (response == null || !"0".equals(response.get("rt_cd"))) {

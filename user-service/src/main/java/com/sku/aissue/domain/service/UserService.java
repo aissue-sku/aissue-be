@@ -24,4 +24,6 @@ public interface UserService {
   UserCredentialsResponse getUserCredentials(String username);
 
   void addPoints(Long userId, AddPointsRequest request);
+
+  void addPointsByUsername(String username, AddPointsRequest request);
 }

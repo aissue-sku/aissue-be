@@ -134,6 +134,25 @@ public class UserServiceImpl implements UserService {
   }
 
   @Override
+  @Transactional
+  public void addPointsByUsername(String username, AddPointsRequest request) {
+    User user =
+        userRepository
+            .findByUsername(username)
+            .orElseThrow(() -> new CustomException(UserErrorCode.USER_NOT_FOUND));
+
+    user.addPoints(request.getPoints());
+    userRepository.save(user);
+
+    log.info(
+        "포인트 지급 - username: {}, 지급: {}p, 잔여: {}p, 사유: {}",
+        username,
+        request.getPoints(),
+        user.getPoints(),
+        request.getReason());
+  }
+
+  @Override
   @Transactional(readOnly = true)
   public UserCredentialsResponse getUserCredentials(String username) {
     User user =
