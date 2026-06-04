@@ -3,7 +3,6 @@
  */
 package com.sku.aissue.domain.service;
 
-import com.sku.aissue.global.s3.S3ImageService;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -37,6 +36,7 @@ import com.sku.aissue.global.client.NotificationServiceClient;
 import com.sku.aissue.global.client.OpenAiClient;
 import com.sku.aissue.global.client.QdrantClient;
 import com.sku.aissue.global.messaging.CardEventPublisher;
+import com.sku.aissue.global.s3.S3ImageService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

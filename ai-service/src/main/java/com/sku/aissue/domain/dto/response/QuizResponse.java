@@ -17,6 +17,8 @@ public class QuizResponse {
   private boolean alreadyAnswered;
   private Integer myAnswer; // 이미 답변한 경우 내가 선택한 인덱스
   private boolean myAnswerCorrect; // 이미 답변한 경우 정답 여부
+  private Integer fakeIndex; // 이미 답변한 경우 정답(가짜 기사) 인덱스
+  private String explanation; // 이미 답변한 경우 조작 해설
 
   @Getter
   @Builder

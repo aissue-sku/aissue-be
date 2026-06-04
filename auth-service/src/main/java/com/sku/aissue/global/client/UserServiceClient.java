@@ -39,7 +39,10 @@ public class UserServiceClient {
     if (t instanceof UsernameNotFoundException) {
       throw (UsernameNotFoundException) t;
     }
-    log.error("user-service 호출 실패 (서킷 브레이커 fallback) - username: {}, error: {}", username, t.getMessage());
+    log.error(
+        "user-service 호출 실패 (서킷 브레이커 fallback) - username: {}, error: {}",
+        username,
+        t.getMessage());
     throw new CustomException(GlobalErrorCode.SERVICE_UNAVAILABLE);
   }
 

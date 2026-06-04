@@ -18,7 +18,8 @@ public enum GlobalErrorCode implements BaseErrorCode {
   DUPLICATE_RESOURCE("GLOBAL4003", "이미 존재하는 리소스입니다.", HttpStatus.CONFLICT),
   FORBIDDEN("GLOBAL4004", "접근 권한이 없습니다.", HttpStatus.FORBIDDEN),
   INTERNAL_SERVER_ERROR("GLOBAL5001", "서버 내부 오류가 발생했습니다.", HttpStatus.INTERNAL_SERVER_ERROR),
-  SERVICE_UNAVAILABLE("GLOBAL5003", "일시적으로 서비스를 사용할 수 없습니다. 잠시 후 다시 시도해주세요.", HttpStatus.SERVICE_UNAVAILABLE),
+  SERVICE_UNAVAILABLE(
+      "GLOBAL5003", "일시적으로 서비스를 사용할 수 없습니다. 잠시 후 다시 시도해주세요.", HttpStatus.SERVICE_UNAVAILABLE),
   ;
 
   private final String code;

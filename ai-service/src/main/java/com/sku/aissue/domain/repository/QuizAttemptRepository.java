@@ -15,4 +15,6 @@ public interface QuizAttemptRepository extends JpaRepository<QuizAttempt, Long> 
   Optional<QuizAttempt> findByUsernameAndQuizDate(String username, LocalDate quizDate);
 
   boolean existsByUsernameAndQuizDate(String username, LocalDate quizDate);
+
+  void deleteByQuizDate(LocalDate quizDate);
 }

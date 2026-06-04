@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ThreadLocalRandom;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -57,13 +58,21 @@ public class DailyQuizService {
       - 절대 "가짜", "허위", "조작" 같은 단어를 본문에 쓰지 마세요.
       - 3-4문장으로 작성하세요.
 
+      [작업 3] 가짜 기사 해설을 작성하세요. 사용자 학습이 목적이므로 충분히 구체적으로 작성합니다.
+      - 다음 3가지를 반드시 포함하세요:
+        (1) 어떤 부분이 조작되었는지 — 구체적 문장이나 수치를 인용
+        (2) 사실은 무엇인지 — 진실에 가까운 정보로 대비 제시
+        (3) 이런 조작을 알아채는 팁 — 일반화 가능한 가짜뉴스 판별 포인트
+      - 분량: 3~5문장, 200~350자
+      - 친근한 설명체("~예요", "~죠" 등 사용 가능)로 작성해 학습 부담을 낮추세요.
+
       반드시 JSON 형식으로만 응답하세요:
       {
         "summary1": "기사1 요약 (3-4문장, 보도체)",
         "summary2": "기사2 요약 (3-4문장, 보도체)",
         "fakeTitle": "가짜 기사 제목 (실제 뉴스 헤드라인 형식)",
         "fakeBody": "가짜 기사 내용 (3-4문장, 보도체)",
-        "explanation": "조작된 핵심 내용 (50자 내외, 정답 공개 시 표시)"
+        "explanation": "가짜 기사 해설 (3~5문장, 조작 부분 + 실제 사실 + 판별 팁 포함)"
       }
       """;
 
@@ -93,6 +102,8 @@ public class DailyQuizService {
         .alreadyAnswered(attempt != null)
         .myAnswer(attempt != null ? attempt.getSelectedIndex() : null)
         .myAnswerCorrect(attempt != null && attempt.isCorrect())
+        .fakeIndex(attempt != null ? quiz.getFakeIndex() : null)
+        .explanation(attempt != null ? quiz.getFakeExplanation() : null)
         .build();
   }
 
@@ -136,9 +147,11 @@ public class DailyQuizService {
   @Transactional
   public QuizResponse generateToday() {
     LocalDate today = LocalDate.now();
+    quizAttemptRepository.deleteByQuizDate(today);
     dailyQuizRepository.findByQuizDate(today).ifPresent(dailyQuizRepository::delete);
     dailyQuizRepository.flush();
     DailyQuiz quiz = generateAndSave(today);
+    log.info("오늘의 퀴즈 수동 재생성 완료 - 기존 응답 모두 초기화");
     return QuizResponse.builder()
         .quizId(quiz.getId())
         .articles(deserializeArticles(quiz.getArticlesJson()))
@@ -159,13 +172,13 @@ public class DailyQuizService {
 
     Map<String, String> generated = generateQuizContent(article1, article2);
 
-    // 진짜 2개 + 가짜 1개를 셔플
+    // 진짜 2개 + 가짜 1개를 셔플 (ThreadLocalRandom 명시 — 기본 RNG 편향 회피)
     record ArticleData(String title, String body, boolean fake) {}
     List<ArticleData> items = new ArrayList<>();
     items.add(new ArticleData(article1.title(), generated.get("summary1"), false));
     items.add(new ArticleData(article2.title(), generated.get("summary2"), false));
     items.add(new ArticleData(generated.get("fakeTitle"), generated.get("fakeBody"), true));
-    Collections.shuffle(items);
+    Collections.shuffle(items, ThreadLocalRandom.current());
 
     int fakeIndex = 0;
     List<QuizArticle> articles = new ArrayList<>();
