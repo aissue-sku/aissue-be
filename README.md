@@ -1,12 +1,12 @@
 # AIssue 프로젝트 현황
 
-> 최종 업데이트: 2026년 5월 27일
+> 최종 업데이트: 2026년 6월 4일
 
 ---
 
 ## 프로젝트 한 줄 소개
 
-**AIssue**는 뉴스를 자동으로 수집하고, AI가 신뢰도를 분석하며, 관심 키워드의 트렌드를 실시간으로 보여주는 뉴스 큐레이션 서비스입니다.
+**AIssue**는 뉴스를 자동으로 수집하고, AI가 신뢰도와 트렌드를 분석하며, 관심 키워드 알림·퀴즈·주식 영향 분석까지 제공하는 뉴스 큐레이션 서비스입니다.
 
 ---
 
@@ -16,41 +16,64 @@
 클라이언트 (브라우저 / 앱)
         ↓
   ┌─────────────────────────────────────────────────────┐
-  │          게이트웨이  :8080  (진입점 · JWT 검증)         │
+  │          게이트웨이  :8080  (진입점 · JWT 검증 · CORS)   │
   └─────────────────────────────────────────────────────┘
         ↓ Eureka 서비스 디스커버리
-  ┌──────────────┬───────────────┬──────────────────────────────────────┬──────────────────┐
-  │  인증 서비스  │  사용자 서비스  │        콘텐츠 수집 서비스               │  알림 서비스      │
-  │  (auth)     │  (user)       │   (content-collection)               │ (notification)   │
-  └──────────────┴───────────────┴──────────────────────────────────────┴──────────────────┘
-        ↓               ↓                       ↓                              ↓
-     Redis         MySQL                    MySQL                          MySQL
-   (토큰 저장)   (aissue_users)         (aissue_content)            (aissue_notifications)
-                                              ↓
-                                       ┌──────────────┐
-                                       │  외부 서비스   │
-                                       │ 네이버 API    │
-                                       │ RSS 피드      │
-                                       │ OpenAI API   │
-                                       │ AWS S3       │
-                                       └──────────────┘
+  ┌──────────────┬──────────┬───────────────────┬──────────────┬──────────────┐
+  │  인증 서비스  │ 사용자 서비스 │ 콘텐츠 수집 서비스    │  AI 서비스    │  알림 서비스   │
+  │  (auth)     │  (user)  │ (content-collection)│   (ai)      │(notification)│
+  └──────────────┴──────────┴───────────────────┴──────────────┴──────────────┘
+        ↓           ↓              ↓                  ↓              ↓
+     Redis       MySQL          MySQL               MySQL          MySQL
+   (토큰 저장) (aissue_users) (aissue_content)    (aissue_ai)  (aissue_notifications)
+                                                     ↓
+                                              Qdrant (벡터 DB)
+
+  ┌──────────────────── 메시지 브로커 ────────────────────┐
+  │  RabbitMQ  :5672  (서비스 간 비동기 이벤트 전달)         │
+  └────────────────────────────────────────────────────┘
+
+  ┌──────────────────── 외부 API ────────────────────────┐
+  │  네이버 뉴스 · RSS 피드 · OpenAI · AWS S3 · 한국투자증권 │
+  └────────────────────────────────────────────────────┘
+
   ┌─────────────────────┐
   │  인프라              │
   │  Eureka  :8761      │
   │  Config  :8888      │
+  │  Dozzle  :9999      │
+  │  Prometheus :9090   │
+  │  Grafana    :3000   │
   └─────────────────────┘
 ```
 
-### 서비스 간 내부 통신
+### 서비스 간 통신
 
-서비스 간 직접 호출은 `RestTemplate + Eureka LoadBalanced` 방식을 사용합니다.
+| 방식 | 사용 케이스 |
+|---|---|
+| **RestTemplate + Eureka LoadBalanced** | 동기 호출이 필요한 내부 API (`/internal/**`) |
+| **RabbitMQ 이벤트** | 느슨한 결합이 필요한 비동기 이벤트 (수집/트렌딩/카드 생성) |
+| **INTERNAL 토큰** | `/internal/**` 엔드포인트 보호 — 외부에서 직접 호출 차단 |
+| **Resilience4j 서킷 브레이커** | ai-service 호출에 적용 (장애 격리, fallback) |
+
+#### 동기 내부 호출 (`/internal/**`)
 
 | 호출 방향 | 엔드포인트 | 용도 |
 |---|---|---|
-| content-collection → notification | `POST /internal/notifications/match` | 이슈 카드 생성 시 구독 키워드 매칭 알림 |
-| user → notification | `POST /internal/notifications/direct` | 포인트 획득 / 사용 알림 |
 | auth → user | `GET /internal/users/{username}/credentials` | 로그인 시 사용자 인증 정보 조회 |
-| quest(예정) → user | `POST /internal/users/{userId}/points` | 퀘스트 완료 시 포인트 지급 |
+| content → ai | `POST /internal/ai/issue-cards` | 이슈 카드 생성 트리거 (스케줄러 경유) |
+| content → ai | `POST /internal/ai/embed` | 신규 기사 임베딩 트리거 |
+| content → notification | `POST /internal/notifications/match` | 카드 키워드 매칭 알림 |
+| user → notification | `POST /internal/notifications/direct` | 포인트 획득 / 사용 알림 |
+| ai → notification | `POST /internal/notifications/match` | 카드 생성 후 매칭 알림 |
+
+#### RabbitMQ 이벤트
+
+| Queue | Producer → Consumer | 용도 |
+|---|---|---|
+| `aissue.queue.ai.content-collected` | content-collection → ai | 신규 기사 수집 → 임베딩 |
+| `aissue.queue.ai.topics-refreshed` | content-collection → ai | 급상승 키워드 갱신 → 카드 생성 |
+| `aissue.queue.notification.cards-generated` | ai → notification | 카드 생성 → 구독 키워드 매칭 알림 |
 
 ---
 
@@ -61,9 +84,14 @@
 | `/api/auths/**` | auth-service |
 | `/api/users/**` | user-service |
 | `/api/contents/**` | content-collection-service |
-| `/api/issues/**` | content-collection-service |
 | `/api/subscriptions/**` | content-collection-service |
+| `/api/issues/**` | **ai-service** |
+| `/api/analysis/**` | **ai-service** |
+| `/api/quiz/**` | **ai-service** |
 | `/api/notifications/**` | notification-service |
+| `/{service}/v3/api-docs` | 각 서비스 Swagger 문서 |
+
+Swagger UI는 게이트웨이 통합 페이지에서 모든 서비스 API를 한 번에 확인할 수 있습니다. (각 서비스의 `OpenAPI.servers`는 `/` 로 설정되어 Swagger UI에서 호출 시 항상 게이트웨이를 거치도록 구성)
 
 ---
 
@@ -84,7 +112,7 @@
 
 ### 2. 캐릭터 커스터마이징 — `user-service`
 
-사용자가 자신만의 캐릭터를 꾸밀 수 있는 기능입니다.  
+사용자가 자신만의 캐릭터를 꾸밀 수 있는 기능입니다.
 아이템은 **구매 후 착용** 가능하며, 구매에는 포인트가 사용됩니다.
 
 #### 카테고리별 아이템
@@ -116,7 +144,7 @@
 | 구분 | 설명 |
 |---|---|
 | 잔액 저장 | `users.points` 컬럼에 보관 |
-| 획득 | 퀘스트 완료 시 지급 (퀘스트 서비스 예정) |
+| 획득 | 출석체크 퀴즈 정답 / 퀘스트 완료 시 지급 |
 | 사용 | 캐릭터 아이템 구매 시 차감 |
 | 알림 | 획득 / 사용 시 알림 서비스로 포인트 변동 내역 전송 |
 
@@ -126,6 +154,7 @@
 
 - **네이버 뉴스 API** + **RSS 피드** (연합뉴스, SBS, 경향신문, 한국경제, 뉴시스, 중앙일보)로 **30분마다** 자동 수집
 - 중복 기사는 자동 제거
+- 수집 완료 시 `content-collected` 이벤트 발행 → ai-service가 임베딩 처리
 
 ---
 
@@ -143,20 +172,34 @@
 - 하루 4회 (00시·06시·12시·18시) 실행
 - 최근 뉴스에서 평소 대비 급격히 언급 증가한 키워드 최대 10개 추출
 - 유사 키워드는 하나로 묶어 중복 제거
+- 갱신 완료 시 `topics-refreshed` 이벤트 발행 → ai-service가 이슈 카드 생성
 
 ---
 
-### 7. AI 이슈 카드 — `content-collection-service`
+### 7. AI 이슈 카드 — `ai-service`
 
-- 급상승 키워드 기반으로 GPT-4o-mini가 카드 형태로 가공
-- 각 카드: 핵심 키워드 + 후킹 문구 + 원문 URL
-- 카드 생성 후 구독 키워드 매칭 → 알림 자동 발송
+- 급상승 키워드 기반으로 **GPT-4o-mini**가 후킹 문구 / 티저 / 태그 / 카테고리를 생성
+- 키워드 → 관련 기사 매칭 시 **Qdrant 벡터 검색** 사용 (실패 시 텍스트 매칭으로 폴백)
+- 카드 생성 후 `cards-generated` 이벤트 발행 → notification-service가 구독자 알림 발송
+
+#### 이미지 생성 정책
+
+이미지는 OpenAI `gpt-image-1`로 생성되어 S3에 업로드됩니다. **이미지 생성은 비용·시간이 크기 때문에 수동 트리거에서만 실행**합니다.
+
+| 진입점 | 이미지 생성 |
+|---|---|
+| `POST /api/issues/cards/refresh` (수동) | ✅ |
+| `POST /api/issues/cards/refresh/no-image` (수동) | ❌ |
+| `POST /internal/ai/issue-cards` (스케줄러 경유) | ❌ |
+| `topics.refreshed` RabbitMQ 이벤트 | ❌ |
+
+이미지 프롬프트는 **다큐멘터리 보도 사진 스타일 + 한국 배경** 으로 강제됩니다. (Reuters/AP photojournalism 스타일, 한국인 등장, Hangul signage, 일러스트/3D 렌더 회피)
 
 > 예시) `"트럼프"` — *"결국 터졌다, 누구도 예상 못한 반전"*
 
 ---
 
-### 8. 뉴스 신뢰도 분석 — `content-collection-service`
+### 8. 뉴스 신뢰도 분석 — `ai-service`
 
 | 분석 항목 | 만점 |
 |---|---|
@@ -168,6 +211,7 @@
 
 - 총점과 함께 판정: **신뢰할 수 있음 / 주의 필요 / 신뢰하기 어려움**
 - 분석 이력 사용자별 저장, 반복 요청 시 DB에서 즉시 반환
+- 카드 생성 시점에 **사전 계산** (critique + 신뢰도 + 종목 분석)되어 사용자 요청 시 즉시 응답
 
 ---
 
@@ -176,6 +220,36 @@
 - 관심 키워드 등록 시 해당 키워드가 이슈 카드에 등장하면 **자동 알림 생성**
 - 구독 추가 / 취소 / 목록 조회
 - 알림 읽음 처리, 전체 읽음, 읽은 알림 삭제
+
+---
+
+### 10. 일일 출석체크 퀴즈 — `ai-service`
+
+- 매일 자정 (`0 0 0 * * *`) AI가 최신 뉴스 기반 객관식 퀴즈 자동 생성
+- 사용자별 하루 1회 응시, 정답 시 포인트 지급
+
+#### API
+
+| Method | 경로 | 설명 |
+|---|---|---|
+| `GET` | `/api/quiz/daily` | 오늘의 퀴즈 조회 |
+| `POST` | `/api/quiz/daily/generate` | 수동 퀴즈 생성 (관리용) |
+| `POST` | `/api/quiz/daily/answer` | 정답 제출 |
+
+---
+
+### 11. 주식 영향 분석 — `ai-service`
+
+- 뉴스 본문에서 종목 추출 → 한국투자증권 KIS Open API로 시세/캔들 데이터 조회
+- 평일 16:30 (`0 30 16 * * MON-FRI`) 시세 스냅샷 저장
+- 카드와 연계되어, 기사가 언급하는 종목의 기술적 분석 결과 제공
+
+#### API
+
+| Method | 경로 | 설명 |
+|---|---|---|
+| `GET` | `/internal/ai/stocks/analyze?contentId={id}` | 기사 ID 기반 종목 분석 |
+| `GET` | `/internal/ai/stocks/{code}` | 종목 코드 기반 직접 분석 |
 
 ---
 
@@ -196,9 +270,18 @@
 | `contents` | 수집된 뉴스 기사 |
 | `trending_keyword` | 급상승 키워드 |
 | `trending_snapshot` | 트렌딩 뉴스 스냅샷 |
+
+### aissue_ai (ai-service)
+
+| 테이블 | 설명 |
+|---|---|
 | `issue_card` | AI 생성 이슈 카드 |
 | `content_analysis` | 신뢰도 분석 결과 |
 | `article_critique` | 기사 비평 결과 |
+| `daily_quiz` | 일일 출석체크 퀴즈 |
+| `quiz_attempt` | 사용자별 퀴즈 응시 이력 |
+| `stock` | 종목 메타 정보 |
+| `stock_price` | 종목 시세/캔들 데이터 |
 
 ### aissue_notifications (notification-service)
 
@@ -215,9 +298,14 @@
 |---|---|
 | 네이버 뉴스 API | 뉴스 수집 |
 | RSS 피드 (6개 언론사) | 뉴스 수집 |
-| OpenAI GPT-4o-mini | 이슈 카드 생성, 신뢰도 분석 |
+| OpenAI GPT-4o-mini | 이슈 카드 텍스트 / 신뢰도 분석 / 퀴즈 생성 |
+| OpenAI gpt-image-1 | 이슈 카드 이미지 생성 (수동 트리거 한정) |
+| OpenAI text-embedding-3-small | 기사·키워드 임베딩 |
+| 한국투자증권 KIS API | 주식 시세 / 종목 분석 |
 | AWS S3 | 이슈 카드 이미지 저장 |
-| Redis | Access/Refresh Token 저장, 이슈 카드 캐싱 |
+| Redis | Access / Refresh Token 저장, 이슈 카드 캐싱 |
+| Qdrant | 기사 벡터 저장 / 키워드 유사도 검색 |
+| RabbitMQ | 서비스 간 비동기 이벤트 메시징 |
 
 ---
 
@@ -226,8 +314,12 @@
 - 모든 서비스는 **Docker 컨테이너**로 패키징
 - **Eureka** `:8761` — 서비스 등록 및 디스커버리
 - **Config Server** `:8888` — 환경별 설정 중앙 관리 (Git 기반)
-- **Gateway** `:8080` — 단일 진입점, JWT 검증, CORS
-- 서버 로그는 **Dozzle** `:9999` 에서 실시간 모니터링
+- **Gateway** `:8080` — 단일 진입점, JWT 검증, CORS, 통합 Swagger UI
+- **RabbitMQ** `:5672` (관리 UI `:15672`) — 비동기 이벤트 메시징
+- **Qdrant** — 기사 임베딩 벡터 DB
+- **Prometheus** `:9090` + **Grafana** `:3000` — 메트릭 수집 및 시각화
+- **Dozzle** `:9999` — 서버 로그 실시간 모니터링
+- **Resilience4j** — ai-service 호출 시 서킷 브레이커 적용 (장애 격리, fallback 로깅)
 
 ---
 
