@@ -48,7 +48,7 @@ public class User extends BaseTimeEntity {
 
   @Column(nullable = false)
   @Builder.Default
-  private int points = 0;
+  private int points = 2000;
 
   public void addPoints(int amount) {
     this.points += amount;
