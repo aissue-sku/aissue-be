@@ -8,6 +8,10 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
+import com.sku.aissue.exception.CustomException;
+import com.sku.aissue.exception.GlobalErrorCode;
+
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -18,6 +22,7 @@ public class UserServiceClient {
 
   private final RestTemplate restTemplate;
 
+  @CircuitBreaker(name = "user", fallbackMethod = "getCredentialsFallback")
   public UserCredentialsDto getCredentials(String username) {
     try {
       return restTemplate.getForObject(
@@ -26,10 +31,16 @@ public class UserServiceClient {
           username);
     } catch (HttpClientErrorException.NotFound e) {
       throw new UsernameNotFoundException(username);
-    } catch (Exception e) {
-      log.error("user-service 인증 정보 조회 실패 - username: {}, error: {}", username, e.getMessage());
-      throw new UsernameNotFoundException(username);
     }
+  }
+
+  @SuppressWarnings("unused")
+  private UserCredentialsDto getCredentialsFallback(String username, Throwable t) {
+    if (t instanceof UsernameNotFoundException) {
+      throw (UsernameNotFoundException) t;
+    }
+    log.error("user-service 호출 실패 (서킷 브레이커 fallback) - username: {}, error: {}", username, t.getMessage());
+    throw new CustomException(GlobalErrorCode.SERVICE_UNAVAILABLE);
   }
 
   public record UserCredentialsDto(String username, String password, String role) {}

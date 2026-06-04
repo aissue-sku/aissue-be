@@ -54,7 +54,7 @@
 | **RestTemplate + Eureka LoadBalanced** | 동기 호출이 필요한 내부 API (`/internal/**`) |
 | **RabbitMQ 이벤트** | 느슨한 결합이 필요한 비동기 이벤트 (수집/트렌딩/카드 생성) |
 | **INTERNAL 토큰** | `/internal/**` 엔드포인트 보호 — 외부에서 직접 호출 차단 |
-| **Resilience4j 서킷 브레이커** | ai-service 호출에 적용 (장애 격리, fallback) |
+| **Resilience4j 서킷 브레이커** | 모든 서비스 간 동기 호출에 적용 (auth→user, content↔ai, ai/content→notification) |
 
 #### 동기 내부 호출 (`/internal/**`)
 
