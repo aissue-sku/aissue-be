@@ -15,7 +15,11 @@ import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
 
 @Configuration
-@EnableConfigurationProperties({OpenAiProperties.class, QdrantProperties.class, S3Properties.class})
+@EnableConfigurationProperties({
+  OpenAiProperties.class,
+  QdrantProperties.class,
+  ImageStorageProperties.class
+})
 public class AppConfig {
 
   @Bean

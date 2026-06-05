@@ -43,6 +43,7 @@ public class SecurityConfig {
                         "/v3/api-docs/**",
                         "/actuator/**",
                         "/internal/**",
+                        "/static/**",
                         "/api/issues",
                         "/api/issues/**",
                         "/api/analysis/content/*/score",

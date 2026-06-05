@@ -75,7 +75,7 @@ public interface IssueCardController {
   @SecurityRequirements
   @Operation(
       summary = "이슈 카드 수동 생성 (이미지 포함)",
-      description = "스케줄러를 기다리지 않고 AI 이슈 카드를 즉시 생성합니다. 각 카드의 이미지를 OpenAI로 생성하여 S3에 업로드합니다.")
+      description = "스케줄러를 기다리지 않고 AI 이슈 카드를 즉시 생성합니다. 각 카드의 이미지를 OpenAI로 생성하여 로컬 디스크에 저장합니다.")
   @ApiResponses({@ApiResponse(responseCode = "200", description = "생성 성공")})
   ResponseEntity<BaseResponse<Void>> refreshIssueCards();
 

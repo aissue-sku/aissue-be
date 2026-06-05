@@ -35,8 +35,8 @@ import com.sku.aissue.global.client.ContentServiceClient.ContentInfo;
 import com.sku.aissue.global.client.NotificationServiceClient;
 import com.sku.aissue.global.client.OpenAiClient;
 import com.sku.aissue.global.client.QdrantClient;
+import com.sku.aissue.global.image.LocalImageService;
 import com.sku.aissue.global.messaging.CardEventPublisher;
-import com.sku.aissue.global.s3.S3ImageService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -108,7 +108,7 @@ public class IssueCardService {
   private final OpenAiClient openAiClient;
   private final QdrantClient qdrantClient;
   private final ObjectMapper objectMapper;
-  private final S3ImageService s3ImageService;
+  private final LocalImageService localImageService;
   private final ArticleCritiqueService articleCritiqueService;
   private final ContentAnalysisService contentAnalysisService;
   private final StockAnalysisService stockAnalysisService;
@@ -452,7 +452,7 @@ public class IssueCardService {
     String wrappedPrompt = IMAGE_PROMPT_PREFIX + imagePrompt;
     try {
       byte[] imageBytes = openAiClient.generateImage(wrappedPrompt);
-      return s3ImageService.upload(imageBytes);
+      return localImageService.upload(imageBytes);
     } catch (Exception e) {
       log.error("이미지 생성/업로드 실패 - prompt: {}, error: {}", wrappedPrompt, e.getMessage(), e);
       return null;

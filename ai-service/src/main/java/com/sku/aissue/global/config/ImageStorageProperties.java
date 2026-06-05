@@ -10,9 +10,12 @@ import lombok.Setter;
 
 @Getter
 @Setter
-@ConfigurationProperties(prefix = "aws.s3")
-public class S3Properties {
+@ConfigurationProperties(prefix = "image.storage")
+public class ImageStorageProperties {
 
-  private String bucket;
-  private String region;
+  private String rootDir;
+
+  private String urlPrefix;
+
+  private String publicBaseUrl;
 }

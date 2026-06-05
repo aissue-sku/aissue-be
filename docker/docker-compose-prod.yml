@@ -199,6 +199,10 @@ services:
       SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
       KIS_APP_KEY: ${KIS_APP_KEY}
       KIS_APP_SECRET: ${KIS_APP_SECRET}
+      IMAGE_STORAGE_ROOT: /app/static/issue-cards
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL}
+    volumes:
+      - issue-card-images:/app/static/issue-cards
     depends_on:
       config-server:
         condition: service_healthy
@@ -220,3 +224,4 @@ networks:
 
 volumes:
   qdrant-data:
+  issue-card-images:

@@ -22,9 +22,6 @@ dependencies {
   // HTML 파싱
   implementation 'org.jsoup:jsoup:1.17.2'
 
-  // AWS S3 (이미지 업로드용)
-  implementation "io.awspring.cloud:spring-cloud-aws-starter-s3:${springCloudAwsVersion}"
-
   // 서비스 디스커버리 + 중앙 설정
   implementation 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client'
   implementation 'org.springframework.cloud:spring-cloud-starter-config'
