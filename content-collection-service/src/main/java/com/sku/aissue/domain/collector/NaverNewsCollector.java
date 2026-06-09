@@ -4,6 +4,7 @@
 package com.sku.aissue.domain.collector;
 
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
@@ -73,6 +74,7 @@ public class NaverNewsCollector implements ContentCollector {
               .queryParam("query", keyword)
               .queryParam("display", DISPLAY_COUNT)
               .queryParam("sort", "date")
+              .encode(StandardCharsets.UTF_8)
               .build()
               .toUri();
 
