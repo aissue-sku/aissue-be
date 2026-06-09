@@ -35,6 +35,7 @@ import com.sku.aissue.global.client.ContentServiceClient.ContentInfo;
 import com.sku.aissue.global.client.NotificationServiceClient;
 import com.sku.aissue.global.client.OpenAiClient;
 import com.sku.aissue.global.client.QdrantClient;
+import com.sku.aissue.global.config.ImageStorageProperties;
 import com.sku.aissue.global.image.LocalImageService;
 import com.sku.aissue.global.messaging.CardEventPublisher;
 
@@ -113,6 +114,7 @@ public class IssueCardService {
   private final ContentAnalysisService contentAnalysisService;
   private final StockAnalysisService stockAnalysisService;
   private final CardEventPublisher cardEventPublisher;
+  private final ImageStorageProperties imageStorageProperties;
 
   @Cacheable(value = "issueCards", key = "'latest'")
   public List<IssueCardResponse> getIssueCards() {
@@ -263,12 +265,24 @@ public class IssueCardService {
         .id(card.getContentId() != null ? card.getContentId().toString() : null)
         .title(card.getTitle())
         .teaser(card.getTeaser())
-        .imageUrl(card.getImageUrl())
+        .imageUrl(toAbsoluteImageUrl(card.getImageUrl()))
         .timeAgo(toTimeAgo(card.getPublishedAt()))
         .tags(deserializeTags(card.getTags()))
         .category(card.getCategory())
         .url(card.getSourceUrl())
         .build();
+  }
+
+  private String toAbsoluteImageUrl(String imageUrl) {
+    if (imageUrl == null || imageUrl.isBlank()) return imageUrl;
+    if (imageUrl.startsWith("http://") || imageUrl.startsWith("https://")) return imageUrl;
+
+    String baseUrl = imageStorageProperties.getPublicBaseUrl();
+    if (baseUrl == null || baseUrl.isBlank()) return imageUrl;
+
+    String trimmedBase = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
+    String path = imageUrl.startsWith("/") ? imageUrl : "/" + imageUrl;
+    return trimmedBase + path;
   }
 
   private List<String> buildKeywordList() {
