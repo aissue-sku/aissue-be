@@ -35,7 +35,10 @@ import lombok.extern.slf4j.Slf4j;
 @Component
 public class NaverNewsCollector implements ContentCollector {
 
-  private static final String[] TRENDING_KEYWORDS = {"이슈", "사건", "속보", "긴급", "주요"};
+  private static final String[] TRENDING_KEYWORDS = {
+    "이슈", "사건", "속보", "긴급", "주요",
+    "헥토", "헥토이노베이션", "헥토파이낸셜", "헥토데이터"
+  };
   private static final int DISPLAY_COUNT = 10;
   private static final DateTimeFormatter NAVER_DATE_FORMAT =
       DateTimeFormatter.ofPattern("EEE, dd MMM yyyy HH:mm:ss Z", Locale.ENGLISH);
