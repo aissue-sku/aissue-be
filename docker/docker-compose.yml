@@ -6,6 +6,7 @@ services:
     expose:
       - "3306"
     environment:
+      TZ: Asia/Seoul
       MYSQL_DATABASE: aissue_users
       MYSQL_USER: ${DB_USERNAME}
       MYSQL_PASSWORD: ${DB_PASSWORD}
@@ -28,6 +29,8 @@ services:
     container_name: redis
     expose:
       - "6379"
+    environment:
+      TZ: Asia/Seoul
     command: ["redis-server", "--requirepass", "${REDIS_PASS}"]
     volumes:
       - redis-data:/data
@@ -58,6 +61,8 @@ services:
     container_name: prometheus
     ports:
       - "9090:9090"
+    environment:
+      TZ: Asia/Seoul
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
@@ -75,6 +80,8 @@ services:
     container_name: qdrant
     expose:
       - "6333"
+    environment:
+      TZ: Asia/Seoul
     volumes:
       - qdrant-data:/qdrant/storage
     networks:
@@ -89,6 +96,7 @@ services:
     ports:
       - "15672:15672"
     environment:
+      TZ: Asia/Seoul
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME:-guest}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
     volumes:
@@ -109,6 +117,7 @@ services:
     ports:
       - "3000:3000"
     environment:
+      TZ: Asia/Seoul
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
       GF_USERS_ALLOW_SIGN_UP: "false"
